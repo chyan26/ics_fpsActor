@@ -10,8 +10,8 @@ import actorcore.CmdrConnection as coreCmdr
 import pdb
 
 class Toy(coreActor.Actor):
-    def __init__(self, name, configFile, debugLevel=30):
-        coreActor.Actor.__init__(self, name, configFile)
+    def __init__(self, name, productName=None, configFile=None, debugLevel=30):
+        coreActor.Actor.__init__(self, name, productName=productName, configFile=configFile)
 
         self.logger.setLevel(debugLevel)
 
@@ -25,8 +25,7 @@ class Toy(coreActor.Actor):
         self.bcast.warn("Toy is connected.")
         
 def test1():
-    toy = Toy('toy', os.path.expandvars('$TOY_DIR/etc/toy.cfg'),
-              debugLevel=5)
+    toy = Toy('toy', productName='toyActor', debugLevel=5)
     
 if __name__ == "__main__":
     test1()
