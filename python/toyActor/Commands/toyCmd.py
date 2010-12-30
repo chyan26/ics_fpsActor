@@ -12,7 +12,7 @@ import opscore.protocols.types as types
 from opscore.utility.qstr import qstr
 import actorcore.help as help
 
-class ToyCmd(object):
+class toyCmd(object):
 
 	def __init__(self, actor):
 		self.actor = actor
@@ -65,7 +65,7 @@ class ToyCmd(object):
 	def doSomething(self, cmd):
 		""" Do something pointless. """
 
-        cnt = cmd.cmd.keywords["cnt"].values[0]
+		cnt = cmd.cmd.keywords["cnt"].values[0]
 		for i in range(cnt):
 			self.respond('cnt=%d' % (i))
 		self.finish()
@@ -73,7 +73,7 @@ class ToyCmd(object):
 	def passAlong(self, cmd):
 		""" Pass a command along to another actor. """
 
-        actor = cmd.cmd.keywords["actor"].values[0]
+		actor = cmd.cmd.keywords["actor"].values[0]
 		cmdString = cmd.cmd.keywords["cmd"].values[0]
 
 		cmdVar = self.actor.cmdr.call(actor=actor, cmdStr=cmdString, timeLim=30.0)

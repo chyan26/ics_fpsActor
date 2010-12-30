@@ -25,12 +25,12 @@ class Toy(actorcore.Actor.Actor):
 		self.logger.setLevel(debugLevel)
 		self.logger.propagate = True
 
-        #
-        # Explicitly load other actor models. We usually need these for FITS headers.
-        #
-        self.models = {}
-        for actor in ["mcp", "guider", "platedb", "tcc"]:
-            self.models[actor] = opscore.actor.model.Model(actor)
+		#
+		# Explicitly load other actor models. We usually need these for FITS headers.
+		#
+		self.models = {}
+		for actor in ["mcp", "guider", "platedb", "tcc"]:
+			self.models[actor] = opscore.actor.model.Model(actor)
 
 		#
 		# Finally start the reactor
