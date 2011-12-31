@@ -10,6 +10,7 @@ from opscore.utility.qstr import qstr
 class ToyCmd(object):
 
 	def __init__(self, actor):
+        # This is essential:
 		self.actor = actor
 
 		# Define some typed command arguemetnts
@@ -22,6 +23,7 @@ class ToyCmd(object):
 		# Declare commands
 		#
 		self.vocab = [
+			('ping', '', self.ping),
 			('status', '', self.status),
 			('doSomething', '<cnt>', self.doSomething),
 			('passAlong', '<actor> <cmd>', self.passAlong),
