@@ -1,4 +1,3 @@
-#declareOptions(flavor=NULL,   name = foo)
 setupRequired(actorcore)
 
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
