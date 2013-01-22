@@ -10,12 +10,11 @@ class Pfics(actorcore.Actor.Actor):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
         actorcore.Actor.Actor.__init__(self, name, productName=productName, configFile=configFile)
-        #self.logger.setLevel(debugLevel)
         
         # Explicitly declare which actors we need to know about, so we can access their keywords.
         #
         self.models = {}
-        for actor in []:
+        for actor in ['mcs']:
             self.models[actor] = opscore.actor.model.Model(actor)
 
 #
