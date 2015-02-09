@@ -125,6 +125,9 @@ class PficsCmd(object):
         cmd.inform('text="dt[mean]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).sum()/cnt,
                                                             (times[:,2]-times[:,1]).sum()/cnt,
                                                             (times[:,3]-times[:,2]).sum()/cnt))
+        cmd.inform('text="dt[max]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).max(),
+                                                           (times[:,2]-times[:,1]).max(),
+                                                           (times[:,3]-times[:,2]).max()))
                                                             
         cmd.finish()
 
