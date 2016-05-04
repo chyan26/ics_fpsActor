@@ -10,7 +10,7 @@ import opscore.protocols.types as types
 
 from opscore.utility.qstr import qstr
 
-class PficsCmd(object):
+class FpsCmd(object):
 
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -30,7 +30,7 @@ class PficsCmd(object):
         ]
 
         # Define typed command arguments for the above commands.
-        self.keys = keys.KeysDictionary("pfics_pfics", (1, 1),
+        self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
                                         keys.Key("fieldID", types.String(), 
                                                  help="ID for the field, which defines the fiber positions"),
