@@ -469,3 +469,128 @@ def pack_move_positioner_with_delay(positions):
 
 	cp = <char *> &Move_Positioner_With_Delay
 	return cp[:cmd_size]
+
+
+def pack_get_database_data(positions):
+	global command_header_counter
+	cdef get_database_data_command Get_Database_Data
+	cdef char *cp
+	cdef int cmd_size, npos, i
+
+	Get_Database_Data.Command_Header.Command_Id = Get_Database_Data_ID
+	npos = len(positions.Module_Id)
+	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
+		sizeof(get_database_data_record) * npos
+	Get_Database_Data.Command_Header.Message_Size = cmd_size
+
+	now = time.time()
+	Get_Database_Data.Command_Header.Time_Stamp1 = int(now)
+	Get_Database_Data.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
+	Get_Database_Data.Command_Header.Command_Counter = command_header_counter
+	command_header_counter += 1
+	Get_Database_Data.Command_Header.Flags = 0x0
+
+	Get_Database_Data.Msg_Header.Number_Of_Records = npos
+
+	for i in range(npos):
+		Get_Database_Data.Msg_Record[i].Module_Id = positions['Module_Id'][i]
+		Get_Database_Data.Msg_Record[i].Positioner_Id = positions['Positioner_Id'][i]
+
+	cp = <char *> &Get_Database_Data
+	return cp[:cmd_size]
+
+
+def pack_set_database_data(xml_data, savedatabase):
+	global command_header_counter
+	cdef set_database_data_command Set_Database_Data
+	cdef char *cp
+	cdef int cmd_size, i
+
+	Set_Database_Data.Command_Header.Command_Id = Set_Database_Data_ID
+	cmd_size = sizeof(command_header) + sizeof(uint32_t) + len(xml_data)
+	Set_Database_Data.Command_Header.Message_Size = cmd_size
+
+	now = time.time()
+	Set_Database_Data.Command_Header.Time_Stamp1 = int(now)
+	Set_Database_Data.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
+	Set_Database_Data.Command_Header.Command_Counter = command_header_counter
+	command_header_counter += 1
+	if savedatabase:
+		Set_Database_Data.Command_Header.Flags = BIT_Save_The_Database
+	else:
+		Set_Database_Data.Command_Header.Flags = 0x0
+
+	Set_Database_Data.Msg_Record.Xml_File_Size = len(xml_data)
+	for i in range(len(xml_data)):
+		Set_Database_Data.Msg_Record.Xml_File_Data[i] = xml_data[i]
+
+	cp = <char *> &Set_Database_Data
+	return cp[:cmd_size]
+
+
+def pack_import_database_from_xml_file(xml_data, savedatabase):
+	global command_header_counter
+	cdef import_database_from_xml_file_command Import_Xml
+	cdef char *cp
+	cdef int cmd_size, i
+
+	Import_Xml.Command_Header.Command_Id = Import_Database_From_Xml_File_ID
+	cmd_size = sizeof(command_header) + sizeof(uint32_t) + len(xml_data)
+	Import_Xml.Command_Header.Message_Size = cmd_size
+
+	now = time.time()
+	Import_Xml.Command_Header.Time_Stamp1 = int(now)
+	Import_Xml.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
+	Import_Xml.Command_Header.Command_Counter = command_header_counter
+	command_header_counter += 1
+	if savedatabase:
+		Import_Xml.Command_Header.Flags = BIT_Save_The_Database
+	else:
+		Import_Xml.Command_Header.Flags = 0x0
+
+	Import_Xml.FileInfo.Name_Length = len(xml_data)
+	for i in range(len(xml_data)):
+		Import_Xml.FileInfo.Name[i] = xml_data[i]
+
+	cp = <char *> &Import_Xml
+	return cp[:cmd_size]
+
+
+def pack_export_database_to_xml_file(xml_data, positions):
+	global command_header_counter
+	cdef export_database_to_xml_file_command Export_Xml
+	cdef char *cp
+	cdef int cmd_size, npos, i, p1, p2
+
+	Export_Xml.Command_Header.Command_Id = Export_Database_To_Xml_File_ID
+	npos = len(positions.Module_Id)
+	cmd_size = sizeof(command_header) + sizeof(number_of_records) + sizeof(uint32_t) \
+	           + len(xml_data) + sizeof(export_database_to_xml_file_record) * npos
+	Export_Xml.Command_Header.Message_Size = cmd_size
+
+	now = time.time()
+	Export_Xml.Command_Header.Time_Stamp1 = int(now)
+	Export_Xml.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
+	Export_Xml.Command_Header.Command_Counter = command_header_counter
+	command_header_counter += 1
+	Export_Xml.Command_Header.Flags = BIT_Degree
+
+	Export_Xml.Msg_Header.Number_Of_Records = npos
+
+	Export_Xml.FileInfo.Name_Length = len(xml_data)
+	for i in range(len(xml_data)):
+		Export_Xml.FileInfo.Name[i] = xml_data[i]
+
+	for i in range(npos):
+		Export_Xml.Msg_Record[i].Module_Id = positions['Module_Id'][i]
+		Export_Xml.Msg_Record[i].Positioner_Id = positions['Positioner_Id'][i]
+
+	# Move positioner info to the end of XML filename
+	p1 = sizeof(command_header) + sizeof(number_of_records) + sizeof(uint32_t) \
+	     + len(xml_data)
+	p2 = sizeof(command_header) + sizeof(number_of_records) + sizeof(xml_file_info)
+	cp = <char *> &Export_Xml
+	for i in range(sizeof(export_database_to_xml_file_record) * npos):
+		cp[p1 + i] = cp[p2 + i]
+
+	return cp[:cmd_size]

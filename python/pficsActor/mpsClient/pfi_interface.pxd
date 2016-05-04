@@ -262,7 +262,7 @@ cdef extern from "pfi_interface_defs.h" nogil:
 
 	#import_Database_From_Xml_File
 
-	struct import_database_to_xml_file_command:
+	struct import_database_from_xml_file_command:
 		command_header Command_Header
 		xml_file_info FileInfo
 

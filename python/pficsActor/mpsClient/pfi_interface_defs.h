@@ -471,7 +471,7 @@ struct export_database_to_xml_file_command
 ////////////////////////////////////////////////////////////
 //import_Database_From_Xml_File
 
-struct import_database_to_xml_file_command
+struct import_database_from_xml_file_command
 {
 	struct command_header						Command_Header;
 	struct xml_file_info						FileInfo;

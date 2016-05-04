@@ -239,3 +239,97 @@ class MPSClient:
 		status, errStr = pfi.parse_command_response(response_message)
 		if status != 0:
 			raise MPSError("Command error: %s", errStr)
+
+	def get_database_data(targets):
+		"""Get Database Data command"""
+		# send command
+		cmd_buffer = pfi.pack_get_database_data(targets)
+		send_command(cmd_buffer)
+		# get command response
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error %s", errStr)
+		# get Database Data
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Send_Database_Data_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		data = pfi.parse_send_database_data(response_message)
+		return data
+
+	def set_database_data(xml_data, save_database=False):
+		"""Set Database Data command"""
+		# send command
+		cmd_buffer = pfi.pack_set_database_data(xml_data, save_database)
+		send_command(cmd_buffer)
+		# get command response
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error %s", errStr)
+		# get Database Data
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Send_Database_Data_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		data = pfi.parse_send_database_data(response_message)
+		return data
+
+	def import_database_from_xml_file(xml_data, save_database=False):
+		"""Import Database from XML File command"""
+		# send command
+		cmd_buffer = pfi.pack_import_database_from_xml_file(xml_data, save_database)
+		send_command(cmd_buffer)
+		# get command response
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error %s", errStr)
+		# get Database Data
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error %s", errStr)
+
+	def export_database_to_xml_file(xml_data, targets):
+		"""Export Database to XML File command"""
+		# send command
+		cmd_buffer = pfi.pack_export_database_to_xml_file(xml_data, targets)
+		send_command(cmd_buffer)
+		# get command response
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error %s", errStr)
+		# get Database Data
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error %s", errStr)
