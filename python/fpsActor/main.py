@@ -2,7 +2,7 @@
 
 import actorcore.Actor
 
-class Pfics(actorcore.Actor.Actor):
+class Fps(actorcore.Actor.Actor):
     def __init__(self, name, productName=None, configFile=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
@@ -10,8 +10,8 @@ class Pfics(actorcore.Actor.Actor):
                                        modelNames=('mcs','mps'))
         
 def main():
-    pfics = Pfics('pfics', 'pficsActor')
-    pfics.run()
+    fps = Fps('fps', 'fpsActor')
+    fps.run()
 
 if __name__ == '__main__':
     main()
