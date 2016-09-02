@@ -92,6 +92,16 @@ typedef char UChar;
 #define BIT_Delay_Theta_Joint1	0x00004000//15 - REV_D
 #define BIT_Delay_Phi_Joint2	0x00008000//16 - REV_D
 
+#define BIT_Target_Changed		0x00010000//17
+#define BIT_Theta_Joint1_Delayed	0x00020000//18
+#define BIT_Phi_Joint2_Delayed	0x00040000//19
+#define BIT_Arm_Collided		0x00080000//20
+#define BIT_Arm_Disabled		0x00100000//21
+#define BIT_Kinematics_Failed	0x00200000//22
+#define BIT_DB_Invalid			0x00400000//23
+#define BIT_Get_Fresh_HK_Data	0x00800000//24
+
+
 
 
 
@@ -101,7 +111,7 @@ typedef char UChar;
 /////////////////////
 //Pfi command to MPS IDS
 #define Move_To_Target_ID					(200)
-#define Go_Home_All_ID						(201)
+#define Go_Home_All_ID						(201)//not used anymore
 #define Go_Home_Positioner_ID				(202)
 #define Move_Positoner_ID					(203)
 #define Calibrate_Motor_Frequencies_ID		(204)
@@ -116,6 +126,10 @@ typedef char UChar;
 #define Move_Positoner_Interval_Duration_ID	(213)
 #define Mps_Software_ID						(214)
 #define Move_Positoner_With_Delay_ID		(215)
+#define Set_HardStop_Orientation_ID			(216)
+
+#define Set_Power_or_Reset_ID				(217)
+#define Run_Diagnostic_ID					(218)
 
 
 /////////////////////
@@ -123,7 +137,7 @@ typedef char UChar;
 #define Command_Response_ID		(300)
 #define Send_Database_Data_ID	(301)
 #define Send_Telemetry_Data_ID	(302)
-
+#define Send_Diagnostic_Result_Telemetry_Data_ID	(303)
 
 
 
@@ -213,11 +227,13 @@ struct move_to_target_command
 /////////////////////////////////////////////////////////////
 //Go_Home_All Command
 
+//not used anymore
 struct go_home_all_msg_record
 {
 	UInt32	Flags;//bit1: Enable Obstacle avoidance
 };
 
+//not used anymore
 struct go_home_all_command
 {
 	struct command_header			Command_Header;
@@ -228,14 +244,14 @@ struct go_home_all_command
 
 /////////////////////////////////////////////////////////////
 //Go_Home_Positioner Command
-
+//not used anymore
 struct go_home_positioner_msg_record
 {
 	UInt32	Module_Id;
 	UInt32	Positioner_Id;
 	UInt32	Flags;
 };
-
+//not used anymore
 struct go_home_positioner_command
 {
 	struct command_header					Command_Header;
@@ -555,10 +571,58 @@ struct mps_software_command
 //Get_Telemetry_Data_ID
 
 
+////////////////////////////////////////////////////////////
+//Set_HardStop_Orientation
+
+
+struct hardstop_orientation_msg_record
+{
+	UInt32	Module_Id;
+	UInt32	Positioner_Id;
+	UInt32	HardStop_Ori;//ccw=0, cw=1
+
+};
+
+
+struct set_hardstop_orientation_data_command
+{
+	struct command_header					Command_Header;
+	struct number_of_records				Msg_Header;
+	struct hardstop_orientation_msg_record	Msg_Record[MAX_RECORD_SIZE];
+};
 
 
 
 
+////////////////////////////////////////////////////////////
+//Turn_Sectors_Power_On_or_Off_ID
+#define PowerOn				(1)
+#define PowerReset			(2)
+#define NUM_Power_Sectors	(6)
+
+
+struct set_sectors_power_or_reset_msg_record
+{
+	UInt32	Command_Type;
+	UInt32	Enable_Set_Motor_Frequencis;
+	UInt32	Sectors[NUM_Power_Sectors];
+};
+
+
+struct set_sectors_power_or_reset_data_command
+{
+	struct command_header							Command_Header;
+	struct set_sectors_power_or_reset_msg_record	Msg_Record;
+};
+
+
+////////////////////////////////////////////////////////////
+
+
+struct diagnostic_command
+{
+	struct command_header	Command_Header;
+};
 
 
 
@@ -569,6 +633,24 @@ struct mps_software_command
 ///////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////
 
+///////////////////////////////////////////////////////////////
+//Execution Time data structure
+
+
+struct execution_time_data
+{
+	Float64		Mps_Command_Receive_Time;
+
+	Float64		FPGA_Command_Send_Time;
+	Float64		FPGA_Command_Response1_Time;
+	Float64		FPGA_Command_Response2_Time;
+
+	Float64		Mps_Command_Response_Time;
+
+};
+
+
+extern struct execution_time_data	Exection_Time_Data;
 
 
 
@@ -599,28 +681,48 @@ struct send_telemetry_data_record
 {
 	UInt32	Module_Id;
 	UInt32	Positioner_Id;
+	UInt32	Flags;
 
-	UInt32  Iteration_number;
+	UInt32	Target_Number;
+	UInt32	Iteration_number;
 
-	Float64 Target_X;
-	Float64 Target_Y;
-	Float64 Current_X;
-	Float64 Current_Y;
+	Float64	Target_X;
+	Float64	Target_Y;
+	Float64	Target_Joint1_Angle;
+	Float64	Target_Joint2_Angle;
+	UInt32	Target_Joint1_Quadrant;
+	UInt32	Target_Joint2_Quadrant;
 
-	Float64 Target_Joint1_Angle;
-	Float64 Target_Joint2_Angle;
-	UInt32  Target_Joint1_Quadrant;
-	UInt32  Target_Joint2_Quadrant;
-
-	Float64 Current_Join1_Angle;
-	Float64 Current_Join2_Angle;
+	Float64	Current_X;
+	Float64	Current_Y;
+	Float64	Current_Join1_Angle;
+	Float64	Current_Join2_Angle;
+	UInt32	Current_Joint1_Quadrant;
+	UInt32	Current_Joint2_Quadrant;
 	UInt32	Joint1_Step;
 	UInt32	Joint2_Step;
-	UInt32  Current_Joint1_Quadrant;
-	UInt32  Current_Joint2_Quadrant;
 
-	UInt32  Seconds;
-	UInt32  Milli_Seconds;
+	Float64	Join1_Step_Delay;
+	Float64	Join2_Step_Delay;
+
+	UInt32	Target_Changed;
+	Float64	Target_Changed_X;
+	Float64	Target_Changed_Y;
+
+	UInt32	HardStop_Ori;
+	Float64	Joint1_from_Angle;
+	Float64	Joint1_to_Angle;
+
+	//FPGA data from recent HK
+	UInt32	FPGA_Board_Number;
+	Float64	FPGA_Temp1;
+	Float64	FPGA_Temp2;
+	Float64	FPGA_Voltage;
+
+	Float64	FPGA_Join1_Frequency;
+	Float64	FPGA_Join1_Current;
+	Float64	FPGA_Join2_Frequency;
+	Float64	FPGA_Join2_Current;
 
 };
 
@@ -628,13 +730,30 @@ struct send_telemetry_data_record
 struct send_telemetry_data_command
 {
 	struct command_header				Command_Header;
+	struct execution_time_data			Execution_Time_Data;
 	struct number_of_records			Msg_Record_Count;
 	struct send_telemetry_data_record	Msg_Record[MAX_RECORD_SIZE];
 };
 
 
 
+//////////////////////////////////////////////////////////////////////////////
+//Send_Diagnostic_Result_Telemetry_Data_ID
 
+#define NumberOfSectors (6)
+struct send_diagnostic_telemetry_record
+{
+	UInt32	Response_Code;
+	UInt32	Detail_Message;
+	UInt32	Sectors[NumberOfSectors];
+};
+
+struct send_diagnostic_telemetry_data
+{
+	struct command_header					Command_Header;
+	struct execution_time_data				Execution_Time_Data;
+	struct send_diagnostic_telemetry_record	Msg_Record;
+};
 
 
 

@@ -52,6 +52,14 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		BIT_Enable_Blind_Move
 		BIT_Delay_Theta_Joint1
 		BIT_Delay_Phi_Joint2
+		BIT_Target_Changed
+		BIT_Theta_Joint1_Delayed
+		BIT_Phi_Joint2_Delayed
+		BIT_Arm_Collided
+		BIT_Arm_Disabled
+		BIT_Kinematics_Failed
+		BIT_DB_Invalid
+		BIT_Get_Fresh_HK_Data
 
 		#Pfi command to MPS IDS
 		Move_To_Target_ID
@@ -70,11 +78,15 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		Move_Positoner_Interval_Duration_ID
 		Mps_Software_ID
 		Move_Positoner_With_Delay_ID
+		Set_HardStop_Orientation_ID
+		Set_Power_or_Reset_ID
+		Run_Diagnostic_ID
 
 		#MPS response to Pfi IDS
 		Command_Response_ID
 		Send_Database_Data_ID
 		Send_Telemetry_Data_ID
+		Send_Diagnostic_Result_Telemetry_Data_ID
 
 	#Command Header
 	struct command_header:
@@ -296,7 +308,7 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		number_of_records Msg_Header
 		current_positioner_msg_record Msg_Record[MAX_RECORD_SIZE]
 
-	#
+	#Mps_Software_ID
 
 	struct mps_software_record:
 		uint32_t Command_Flags
@@ -305,7 +317,47 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		command_header Command_Header
 		mps_software_record Msg_Record
 
+	#Set_HardStop_Orientation
 
+	struct hardstop_orientation_msg_record:
+		uint32_t Module_Id
+		uint32_t Positioner_Id
+		uint32_t HardStop_Ori
+
+	struct set_hardstop_orientation_data_command:
+		command_header Command_Header
+		number_of_records Msg_Header
+		hardstop_orientation_msg_record Msg_Record[MAX_RECORD_SIZE]
+
+	#Turn_Sectors_Power_On_or_Off_ID
+
+	enum:
+		PowerOn
+		PowerReset
+		NUM_Power_Sectors
+
+	struct set_sectors_power_or_reset_msg_record:
+		uint32_t Command_Type
+		uint32_t Enable_Set_Motor_Frequencis
+		uint32_t Sectors[NUM_Power_Sectors]
+
+	struct set_sectors_power_or_reset_data_command:
+		command_header Command_Header
+		set_sectors_power_or_reset_msg_record Msg_Record
+
+	#Run_Diagnostic_ID
+
+	struct diagnostic_command:
+		command_header Command_Header
+
+	#Execution Time data structure
+
+	struct execution_time_data:
+		double Mps_Command_Receive_Time
+		double FPGA_Command_Send_Time
+		double FPGA_Command_Response1_Time
+		double FPGA_Command_Response2_Time
+		double Mps_Command_Response_Time
 
 	#Command_Response Response
 
@@ -313,7 +365,6 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		uint32_t StatusNumber
 		uint32_t Error_String_Size
 		char Error_String[MAX_ERROR_STRING_SIZE] #NULL terminated text
-
 
 	struct command_response:
 		command_header Response_Header
@@ -324,29 +375,60 @@ cdef extern from "pfi_interface_defs.h" nogil:
 	struct send_telemetry_data_record:
 		uint32_t Module_Id
 		uint32_t Positioner_Id
+		uint32_t Flags
+		uint32_t Target_Number
 		uint32_t Iteration_number
 		double Target_X
 		double Target_Y
-		double Current_X
-		double Current_Y
 		double Target_Joint1_Angle
 		double Target_Joint2_Angle
 		uint32_t Target_Joint1_Quadrant
 		uint32_t Target_Joint2_Quadrant
+		double Current_X
+		double Current_Y
 		double Current_Join1_Angle
 		double Current_Join2_Angle
-		uint32_t Joint1_Step
-		uint32_t Joint2_Step
 		uint32_t Current_Joint1_Quadrant
 		uint32_t Current_Joint2_Quadrant
-		uint32_t Seconds
-		uint32_t Milli_Seconds
+		uint32_t Joint1_Step
+		uint32_t Joint2_Step
+		double Join1_Step_Delay
+		double Join2_Step_Delay
+		uint32_t Target_Changed
+		double Target_Changed_X
+		double Target_Changed_Y
+		uint32_t HardStop_Ori
+		double Joint1_from_Angle
+		double Joint1_to_Angle
+		uint32_t FPGA_Board_Number
+		double FPGA_Temp1
+		double FPGA_Temp2
+		double FPGA_Voltage
+		double FPGA_Join1_Frequency
+		double FPGA_Join1_Current
+		double FPGA_Join2_Frequency
+		double FPGA_Join2_Current
 
 	struct send_telemetry_data_command:
 		command_header Command_Header
+		execution_time_data Execution_Time_Data
 		number_of_records Msg_Record_Count
 		send_telemetry_data_record Msg_Record[MAX_RECORD_SIZE]
 
+	#Send_Diagnostic_Result_Telemetry_Data_ID
+
+	enum:
+		NumberOfSectors
+
+	struct send_diagnostic_telemetry_record:
+		uint32_t Response_Code
+		uint32_t Detail_Message
+		uint32_t Sectors[NumberOfSectors]
+
+	struct send_diagnostic_telemetry_data:
+		command_header Command_Header
+		execution_time_data Execution_Time_Data
+		send_diagnostic_telemetry_record Msg_Record
 
 	#DataBase Ids
 

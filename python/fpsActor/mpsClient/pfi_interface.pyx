@@ -123,35 +123,60 @@ def parse_send_database_data(unsigned char[:] buf):
 
 def parse_send_telemetry_data(unsigned char[:] buf):
 	cdef int index = 0, i, sz
+	cdef execution_time_data *p_exec_time
 	cdef number_of_records *p_number_of_records
 	cdef send_telemetry_data_record *p_telemetry_data_record
+
+	p_exec_time = <execution_time_data *> &buf[index]
+	exec_time = {}
+	exec_time['Mps_Command_Receive_Time'] = p_exec_time.Mps_Command_Receive_Time
+	exec_time['FPGA_Command_Send_Time'] = p_exec_time.FPGA_Command_Send_Time
+	exec_time['FPGA_Command_Response1_Time'] = p_exec_time.FPGA_Command_Response1_Time
+	exec_time['FPGA_Command_Response2_Time'] = p_exec_time.FPGA_Command_Response2_Time
+	exec_time['Mps_Command_Response_Time'] = p_exec_time.Mps_Command_Response_Time
+	index += sizeof(execution_time_data)
 
 	p_number_of_records = <number_of_records *> &buf[index]
 	sz = p_number_of_records.Number_Of_Records
 	print "Parse_Send_Telemetry_Data() ==>> Number_Of_Records=%d" % sz
-
 	index += sizeof(number_of_records)
 
 	data = {
 		'Module_Id': [],
 		'Positioner_Id': [],
+		'Flags': [],
+		'Target_Number': [],
 		'Iteration_number': [],
 		'Target_X': [],
 		'Target_Y': [],
-		'Current_X': [],
-		'Current_Y': [],
 		'Target_Joint1_Angle': [],
 		'Target_Joint2_Angle': [],
 		'Target_Joint1_Quadrant': [],
 		'Target_Joint2_Quadrant': [],
+		'Current_X': [],
+		'Current_Y': [],
 		'Current_Join1_Angle': [],
 		'Current_Join2_Angle': [],
-		'Joint1_Step': [],
-		'Joint2_Step': [],
 		'Current_Joint1_Quadrant': [],
 		'Current_Joint2_Quadrant': [],
-		'Seconds': [],
-		'Milli_Seconds': []
+		'Joint1_Step': [],
+		'Joint2_Step': [],
+		'Join1_Step_Delay': [],
+		'Join2_Step_Delay': [],
+		'Target_Changed': [],
+		'Target_Changed_X': [],
+		'Target_Changed_Y': [],
+		'HardStop_Ori': [],
+		'Joint1_from_Angle': [],
+		'Joint1_to_Angle': [],
+		'FPGA_Board_Number': [],
+		'FPGA_Temp1': [],
+		'FPGA_Temp2': [],
+		'FPGA_Voltage': [],
+		'FPGA_Join1_Frequency': [],
+		'FPGA_Join1_Current': [],
+		'FPGA_Join2_Frequency': [],
+		'FPGA_Join2_Current': []
 	}
 
 	print "Parse_Send_Telemetry_Data() ==>> : \n"
@@ -165,25 +190,41 @@ def parse_send_telemetry_data(unsigned char[:] buf):
 				p_telemetry_data_record.Iteration_number)
 		data['Module_Id'].append(p_telemetry_data_record.Module_Id)
 		data['Positioner_Id'].append(p_telemetry_data_record.Positioner_Id)
+		data['Flags'].append(p_telemetry_data_record.Flags)
+		data['Target_Number'].append(p_telemetry_data_record.Target_Number)
 		data['Iteration_number'].append(p_telemetry_data_record.Iteration_number)
 		data['Target_X'].append(p_telemetry_data_record.Target_X)
 		data['Target_Y'].append(p_telemetry_data_record.Target_Y)
-		data['Current_X'].append(p_telemetry_data_record.Current_X)
-		data['Current_Y'].append(p_telemetry_data_record.Current_Y)
 		data['Target_Joint1_Angle'].append(p_telemetry_data_record.Target_Joint1_Angle)
 		data['Target_Joint2_Angle'].append(p_telemetry_data_record.Target_Joint2_Angle)
 		data['Target_Joint1_Quadrant'].append(p_telemetry_data_record.Target_Joint1_Quadrant)
 		data['Target_Joint2_Quadrant'].append(p_telemetry_data_record.Target_Joint2_Quadrant)
+		data['Current_X'].append(p_telemetry_data_record.Current_X)
+		data['Current_Y'].append(p_telemetry_data_record.Current_Y)
 		data['Current_Join1_Angle'].append(p_telemetry_data_record.Current_Join1_Angle)
 		data['Current_Join2_Angle'].append(p_telemetry_data_record.Current_Join2_Angle)
-		data['Joint1_Step'].append(p_telemetry_data_record.Joint1_Step)
-		data['Joint2_Step'].append(p_telemetry_data_record.Joint2_Step)
 		data['Current_Joint1_Quadrant'].append(p_telemetry_data_record.Current_Joint1_Quadrant)
 		data['Current_Joint2_Quadrant'].append(p_telemetry_data_record.Current_Joint2_Quadrant)
-		data['Seconds'].append(p_telemetry_data_record.Seconds)
-		data['Milli_Seconds'].append(p_telemetry_data_record.Milli_Seconds)
+		data['Joint1_Step'].append(p_telemetry_data_record.Joint1_Step)
+		data['Joint2_Step'].append(p_telemetry_data_record.Joint2_Step)
+		data['Join1_Step_Delay'].append(p_telemetry_data_record.Join1_Step_Delay)
+		data['Join2_Step_Delay'].append(p_telemetry_data_record.Join2_Step_Delay)
+		data['Target_Changed'].append(p_telemetry_data_record.Target_Changed)
+		data['Target_Changed_X'].append(p_telemetry_data_record.Target_Changed_X)
+		data['Target_Changed_Y'].append(p_telemetry_data_record.Target_Changed_Y)
+		data['HardStop_Ori'].append(p_telemetry_data_record.HardStop_Ori)
+		data['Joint1_from_Angle'].append(p_telemetry_data_record.Joint1_from_Angle)
+		data['Joint1_to_Angle'].append(p_telemetry_data_record.Joint1_to_Angle)
+		data['FPGA_Board_Number'].append(p_telemetry_data_record.FPGA_Board_Number)
+		data['FPGA_Temp1'].append(p_telemetry_data_record.FPGA_Temp1)
+		data['FPGA_Temp2'].append(p_telemetry_data_record.FPGA_Temp2)
+		data['FPGA_Voltage'].append(p_telemetry_data_record.FPGA_Voltage)
+		data['FPGA_Join1_Frequency'].append(p_telemetry_data_record.FPGA_Join1_Frequency)
+		data['FPGA_Join1_Current'].append(p_telemetry_data_record.FPGA_Join1_Current)
+		data['FPGA_Join2_Frequency'].append(p_telemetry_data_record.FPGA_Join2_Frequency)
+		data['FPGA_Join2_Current'].append(p_telemetry_data_record.FPGA_Join2_Current)
 
-	return data
+	return (exec_time, data)
 
 
 def pack_move_to_target(sequence_number, iteration_number, positions, obstacle_avoidance, enable_blind_move):
@@ -594,3 +635,79 @@ def pack_export_database_to_xml_file(xml_data, positions):
 		cp[p1 + i] = cp[p2 + i]
 
 	return cp[:cmd_size]
+
+
+def pack_set_hardstop_orientation(positions):
+	global command_header_counter
+	cdef set_hardstop_orientation_data_command Set_HardStop_Ori
+	cdef char *cp
+	cdef int cmd_size, npos, i
+
+	Set_HardStop_Ori.Command_Header.Command_Id = Set_HardStop_Orientation_ID
+	npos = len(positions.Module_Id)
+	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
+		sizeof(hardstop_orientation_msg_record) * npos
+	Set_HardStop_Ori.Command_Header.Message_Size = cmd_size
+
+	now = time.time()
+	Set_HardStop_Ori.Command_Header.Time_Stamp1 = int(now)
+	Set_HardStop_Ori.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
+	Set_HardStop_Ori.Command_Header.Command_Counter = command_header_counter
+	command_header_counter += 1
+	Set_HardStop_Ori.Command_Header.Flags = 0x0
+
+	Set_HardStop_Ori.Msg_Header.Number_Of_Records = npos
+
+	for i in range(npos):
+		Set_HardStop_Ori.Msg_Record[i].Module_Id = positions['Module_Id'][i]
+		Set_HardStop_Ori.Msg_Record[i].Positioner_Id = positions['Positioner_Id'][i]
+		Set_HardStop_Ori.Msg_Record[i].HardStop_Ori = positions['HardStop_Ori'][i]
+
+	cp = <char *> &Set_HardStop_Ori
+	return cp[:cmd_size]
+
+
+def pack_set_power_or_reset(cmd, set_motor_freq, sectors):
+	global command_header_counter
+	cdef set_sectors_power_or_reset_data_command Set_Power_or_Reset
+	cdef char *cp
+	cdef int cmd_size, i
+
+	Set_Power_or_Reset.Command_Header.Command_Id = Set_Power_or_Reset_ID
+	cmd_size = sizeof(set_sectors_power_or_reset_data_command)
+	Set_Power_or_Reset.Command_Header.Message_Size = cmd_size
+
+	now = time.time()
+	Set_Power_or_Reset.Command_Header.Time_Stamp1 = int(now)
+	Set_Power_or_Reset.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
+	Set_Power_or_Reset.Command_Header.Command_Counter = command_header_counter
+	command_header_counter += 1
+	Set_Power_or_Reset.Command_Header.Flags = 0x0
+
+	Set_Power_or_Reset.Msg_Record.Command_Type = cmd
+	Set_Power_or_Reset.Msg_Record.Enable_Set_Motor_Frequencis = set_motor_freq
+	for i in range(NUM_Power_Sectors):
+		Set_Power_or_Reset.Msg_Record.Sectors[i] = sectors[i]
+
+	cp = <char *> &Set_Power_or_Reset
+	return cp[:cmd_size]
+
+
+def pack_run_diagnostic():
+	global command_header_counter
+	cdef command_header Command_Header
+	cdef char *cp
+
+	Command_Header.Command_Id = Run_Diagnostic_ID
+	Command_Header.Message_Size = sizeof(command_header)
+
+	now = time.time()
+	Command_Header.Time_Stamp1 = int(now)
+	Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
+	Command_Header.Command_Counter = command_header_counter
+	command_header_counter += 1
+
+	Command_Header.Flags = 0
+
+	cp = <char *> &Command_Header
+	return cp[:sizeof(command_header)]

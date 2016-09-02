@@ -333,3 +333,75 @@ class MPSClient:
 		status, errStr = pfi.parse_command_response(response_message)
 		if status != 0:
 			raise MPSError("Command error %s", errStr)
+
+	def set_hardstop_orientation(orientations):
+		"""Set_HardStop_Orientation"""
+		# send command
+		cmd_buffer = pfi.pack_set_hardstop_orientation(orientations)
+		send_command(cmd_buffer)
+		# get command response (validate command)
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error: %s", errStr)
+		# get command response (Command is done)
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error: %s", errStr)
+
+	def set_power_or_reset(cmd, set_motor_freq, sectors):
+		"""Set_Power_or_Reset"""
+		# send command
+		cmd_buffer = pfi.pack_set_power_or_reset(cmd, set_motor_freq, sectors)
+		send_command(cmd_buffer)
+		# get command response (validate command)
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error: %s", errStr)
+		# get command response (Command is done)
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error: %s", errStr)
+
+	def run_diagnostic():
+		"""Run_Diagnostic"""
+		# send command
+		cmd_buffer = pfi.pack_run_diagnostic()
+		send_command(cmd_buffer)
+		# get command response (validate command)
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error: %s", errStr)
+		# get command response (Command is done)
+		response_header = get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id != Command_Response_ID:
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 0:
+			raise MPSError("Command error: %s", errStr)
