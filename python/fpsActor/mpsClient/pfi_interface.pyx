@@ -234,7 +234,7 @@ def pack_move_to_target(sequence_number, iteration_number, positions, obstacle_a
 	cdef int cmd_size, npos, i
 
 	Move_To_Target.Command_Header.Command_Id = Move_To_Target_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(move_to_target_msg_header) + \
 		sizeof(move_to_target_msg_record) * npos
 	Move_To_Target.Command_Header.Message_Size = cmd_size
@@ -287,7 +287,7 @@ def pack_calibrate_motor_frequencies(targets):
 	cdef int cmd_size, npos, i
 
 	Calibrate.Command_Header.Command_Id = Calibrate_Motor_Frequencies_ID
-	npos = len(targets.Module_Id)
+	npos = len(targets['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(calibrate_motor_frequencies_msg_record) * npos
 	Calibrate.Command_Header.Message_Size = cmd_size
@@ -353,7 +353,7 @@ def pack_get_telemetry_data(positions):
 	cdef int cmd_size, npos, i
 
 	Get_Telemetry.Command_Header.Command_Id = Get_Telemetry_Data_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(get_telemetry_data_record) * npos
 	Get_Telemetry.Command_Header.Message_Size = cmd_size
@@ -382,7 +382,7 @@ def pack_set_current_position(positions):
 	cdef int cmd_size, npos, i
 
 	Set_Current_Position.Command_Header.Command_Id = Set_Current_Position_Data_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(current_positioner_msg_record) * npos
 	Set_Current_Position.Command_Header.Message_Size = cmd_size
@@ -417,7 +417,7 @@ def pack_move_positioner(positions):
 	cdef int cmd_size, npos, i
 
 	Move_Positioner_command.Command_Header.Command_Id = Move_Positoner_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(move_positioner_msg_record) * npos
 	Move_Positioner_command.Command_Header.Message_Size = cmd_size
@@ -449,7 +449,7 @@ def pack_move_positioner_interval_duration(positions):
 	cdef int cmd_size, npos, i
 
 	Move_Positioner_Int_Dur.Command_Header.Command_Id = Move_Positoner_Interval_Duration_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(move_positioner_int_dur_msg_record) * npos
 	Move_Positioner_Int_Dur.Command_Header.Message_Size = cmd_size
@@ -485,7 +485,7 @@ def pack_move_positioner_with_delay(positions):
 	cdef int cmd_size, npos, i
 
 	Move_Positioner_With_Delay.Command_Header.Command_Id = Move_Positoner_With_Delay_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(move_positioner_with_delay_msg_record) * npos
 	Move_Positioner_With_Delay.Command_Header.Message_Size = cmd_size
@@ -519,7 +519,7 @@ def pack_get_database_data(positions):
 	cdef int cmd_size, npos, i
 
 	Get_Database_Data.Command_Header.Command_Id = Get_Database_Data_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(get_database_data_record) * npos
 	Get_Database_Data.Command_Header.Message_Size = cmd_size
@@ -604,7 +604,7 @@ def pack_export_database_to_xml_file(xml_data, positions):
 	cdef int cmd_size, npos, i, p1, p2
 
 	Export_Xml.Command_Header.Command_Id = Export_Database_To_Xml_File_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + sizeof(uint32_t) \
 	           + len(xml_data) + sizeof(export_database_to_xml_file_record) * npos
 	Export_Xml.Command_Header.Message_Size = cmd_size
@@ -644,7 +644,7 @@ def pack_set_hardstop_orientation(positions):
 	cdef int cmd_size, npos, i
 
 	Set_HardStop_Ori.Command_Header.Command_Id = Set_HardStop_Orientation_ID
-	npos = len(positions.Module_Id)
+	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
 		sizeof(hardstop_orientation_msg_record) * npos
 	Set_HardStop_Ori.Command_Header.Message_Size = cmd_size
