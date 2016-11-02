@@ -11,7 +11,9 @@ import opscore.protocols.types as types
 from opscore.utility.qstr import qstr
 
 class FpsCmd(object):
-
+    
+    odometer=0
+    
     def __init__(self, actor):
         # This lets us access the rest of the actor.
         self.actor = actor
@@ -25,13 +27,18 @@ class FpsCmd(object):
             ('ping', '', self.ping),
             ('status', '', self.status),
             ('setupField', 'fieldID', self.setupField),
+            ('setupOdometer', '<odo>', self.setupOdometer),
             ('testloop', '<cnt> [<expTime>]', self.testloop),
             ('home', '<cnt> [<expTime>]', self.home),
+            ('dbinit', '', self.dbinit),
+            ('runmps', '', self.runmps),
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
+                                        keys.Key("odo", types.Int(), help="exposure odometer"),
+                                        keys.Key("runmps", types.Int(), help="mps test"),
                                         keys.Key("fieldID", types.String(), 
                                                  help="ID for the field, which defines the fiber positions"),
                                         keys.Key("expTime", types.Float(), 
@@ -53,6 +60,18 @@ class FpsCmd(object):
         cmd.inform(keyMsg)
         cmd.diag('text="still nothing to say"')
         cmd.finish()
+        
+    def runmps(self, cmd):
+        """Report status and version; obtain and send current data"""
+
+        
+
+        keyStrings = ['text="MPS TEST nothing to say, really"']
+        keyMsg = '; '.join(keyStrings)
+
+        cmd.inform(keyMsg)
+        cmd.diag('text="MPS TEST still nothing to say"')
+        cmd.finish()
 
 
     def setupField(self, cmd):
@@ -72,6 +91,8 @@ class FpsCmd(object):
         """
 
         return numpy.random.random(9600).reshape(4800,2).astype('f4')
+        
+        cmd.finish()
         
     def testloop(self, cmd):
         """ Run the expose-move loop a few times. For development. """
@@ -94,7 +115,7 @@ class FpsCmd(object):
                                           forUserCmd=cmd, timeLim=expTime+5.0)
             if cmdVar.didFail:
                 cmd.fail('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
-                return
+            #    return
             # Encoding will be encapsulated.
             rawCentroids = self.actor.models['mcs'].keyVarDict['centroidsChunk'][0]
             centroids = numpy.fromstring(base64.b64decode(rawCentroids), dtype='f4').reshape(2400,2)
@@ -130,4 +151,34 @@ class FpsCmd(object):
                                                            (times[:,3]-times[:,2]).max()))
                                                             
         cmd.finish()
+        
+    def setupOdometer(self, cmd):
+        """Setting the odometer number and start a data base table."""
+        odometer = cmd.cmd.keywords["odo"].values[0]
+        cmd.inform('"odometer"= %d'%(odometer))
 
+        
+        cmd.finish()
+        
+    def dbinit(self, cmd):
+        """ Initializing the database.  """
+  
+        try:
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+        except:
+            print "I am unable to connect to the database"
+        
+        cur = conn.cursor()
+        cur.execute("CREATE TABLE FPS_INFO(runid VARCHAR(20) PRIMARY KEY," 
+                                           "odometer INT, hst_time time, ut_time time," 
+                                           "ra float8, dec float8, temp float4, fps_version VARCHAR(20),"
+                                           "db_version VARCHAR(20))")  
+        
+        cur.execute("CREATE TABLE MORTORMAP_INFO(fibre_id INT PRIMARY KEY, odometer INT, mortormap_version VARCHAR(20)"  
+                                           "mortormap_path VARCHAR(256), mortormap_date VARCHAR(20))") 
+        
+        conn.commit()
+  
+            
+        cmd.finish("text='FPS database initializing finished.'")
+          
