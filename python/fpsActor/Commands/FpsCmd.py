@@ -4,9 +4,12 @@ import json
 import base64
 import numpy
 import time
-
+import sys
+sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
+                
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
+import pfi_interface as pfi
 
 from opscore.utility.qstr import qstr
 
@@ -31,14 +34,14 @@ class FpsCmd(object):
             ('testloop', '<cnt> [<expTime>]', self.testloop),
             ('home', '<cnt> [<expTime>]', self.home),
             ('dbinit', '', self.dbinit),
-            ('runmps', '', self.runmps),
+            ('runmpstest', '', self.runmpstest),
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
                                         keys.Key("odo", types.Int(), help="exposure odometer"),
-                                        keys.Key("runmps", types.Int(), help="mps test"),
+                                        keys.Key("runmpstest", types.Int(), help="mps test"),
                                         keys.Key("fieldID", types.String(), 
                                                  help="ID for the field, which defines the fiber positions"),
                                         keys.Key("expTime", types.Float(), 
@@ -58,13 +61,32 @@ class FpsCmd(object):
         keyMsg = '; '.join(keyStrings)
 
         cmd.inform(keyMsg)
+        cmd.diag(sys.path)
         cmd.diag('text="still nothing to say"')
         cmd.finish()
         
-    def runmps(self, cmd):
+    def runmpstest(self, cmd):
         """Report status and version; obtain and send current data"""
-
         
+        
+        datastring=pfi.pack_mps_software(shutdown=False, restart=True, save_database=False)
+        fileName='pack_mps_software.bin'
+
+        with open(fileName, "wb") as f:
+            f.write(datastring)
+
+
+        p={'Module_Id':[0,1],'Positioner_Id':[2,2],'Current_Position_X':[0,0],'Current_Position_Y':[0,1],\
+            'Target_Position_X':[10,20],'Target_Position_Y':[10,20], 'X_axes_Uncertainty':[0.2,0.2],\
+            'Y_axes_Uncertainty':[0.2,0.2],'Joint1_Delay_Count':[0,1],'Joint2_Delay_Count':[0,1],'fixed_arm':[0,0],\
+            'target_latched':[1,1]}
+
+        datastring=pfi.pack_move_to_target(sequence_number=1, iteration_number=0, positions=p, obstacle_avoidance=0, enable_blind_move=0)
+        fileName='pack_move_to_target.bin'
+        
+        with open(fileName, "wb") as f:
+            f.write(datastring)
+
 
         keyStrings = ['text="MPS TEST nothing to say, really"']
         keyMsg = '; '.join(keyStrings)
