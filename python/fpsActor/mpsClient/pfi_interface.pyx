@@ -56,11 +56,13 @@ def pack_go_home_all(obstacle_avoidance, enable_blind_move, j1_use_fast_map, j2_
 	return cp[:sizeof(go_home_all_command)]
 
 
-def parse_msg_header_response(unsigned char[:] buf):
+def parse_msg_header_response(resp):
 	cdef:
 		command_header *pHeader
 		int cmd_id, cmd_counter, body_size
+		unsigned char[:] buf
 
+	buf = bytearray(resp)
 	pHeader = <command_header *> &buf[0]
 	cmd_id = pHeader.Command_Id
 	cmd_counter = pHeader.Command_Counter
@@ -92,12 +94,14 @@ cdef isValid_Mps_Response(Response_Id):
 		return False
 
 
-def parse_command_response(unsigned char[:] buf):
+def parse_command_response(resp):
 	cdef:
 		command_response_error *pData
 		int status, sz
 		char *errStr
+		unsigned char[:] buf
 
+	buf = bytearray(resp)
 	pData = <command_response_error *> &buf[0];
 	status = pData.StatusNumber
 	sz = pData.Error_String_Size
@@ -108,11 +112,13 @@ def parse_command_response(unsigned char[:] buf):
 	return (status, errStr[:sz])
 
 
-def parse_send_database_data(unsigned char[:] buf):
+def parse_send_database_data(resp):
 	cdef uint32_t *pUsi
 	cdef uint32_t sz
 	cdef unsigned char *cp
+	cdef unsigned char[:] buf
 
+	buf = bytearray(resp)
 	cp = &buf[0]
 	pUsi = <uint32_t *> cp
 	sz = pUsi[0]
@@ -121,12 +127,14 @@ def parse_send_database_data(unsigned char[:] buf):
 	return cp[:sz]
 
 
-def parse_send_telemetry_data(unsigned char[:] buf):
+def parse_send_telemetry_data(resp):
 	cdef int index = 0, i, sz
 	cdef execution_time_data *p_exec_time
 	cdef number_of_records *p_number_of_records
 	cdef send_telemetry_data_record *p_telemetry_data_record
+	cdef unsigned char[:] buf
 
+	buf = bytearray(resp)
 	p_exec_time = <execution_time_data *> &buf[index]
 	exec_time = {}
 	exec_time['Mps_Command_Receive_Time'] = p_exec_time.Mps_Command_Receive_Time
@@ -325,7 +333,7 @@ def pack_mps_software(shutdown, restart, save_database):
 	cdef char *cp
 
 	Mps_Software_Command.Command_Header.Command_Id = Mps_Software_ID
-	Mps_Software_Command.Command_Header.Message_Size = header_size
+	Mps_Software_Command.Command_Header.Message_Size = sizeof(mps_software_command)
 
 	now = time.time()
 	Mps_Software_Command.Command_Header.Time_Stamp1 = int(now)
