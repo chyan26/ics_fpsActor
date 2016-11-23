@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 import json
 import base64
 import numpy
@@ -34,7 +32,12 @@ class FpsCmd(object):
             ('testloop', '<cnt> [<expTime>]', self.testloop),
             ('home', '<cnt> [<expTime>]', self.home),
             ('dbinit', '', self.dbinit),
+            ('sendCommand', '', self.sendCommand),
+            ('getResponse', '', self.getResponse),
             ('runmpstest', '', self.runmpstest),
+            ('gohomeall', '', self.gohomeall),
+            ('movetotarget', '', self.movetotarget),
+
         ]
 
         # Define typed command arguments for the above commands.
@@ -65,6 +68,69 @@ class FpsCmd(object):
         cmd.diag('text="still nothing to say"')
         cmd.finish()
         
+    def sendCommand(self,cmd):
+         """ sending command to MPS host """
+         cmd.diag('text="Sending command to MPS server."')
+     
+         mpshost=""
+         mpsport=8888
+         
+         m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+         data=""
+         
+         m.send_command(data)
+         
+         cmd.diag('text="Sending command to MPS server finished."')
+         cmd.finish()
+
+    def getResponse(self,cmd):
+         """ sending command to MPS host """
+         cmd.diag('text="Sending command to MPS server."')
+     
+         mpshost=""
+         mpsport=8888
+         
+         m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+         size=20
+         
+         data=m.get_response(size)
+         
+         cmd.diag('text="Sending command to MPS server finished."')
+         cmd.finish()
+
+    def gohomeall(self,cmd):
+        """ Home all the science fibres """
+            
+        mpshost=""
+        mpsport=8888
+        
+        m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        telemetry=m.go_home_all(obstacle_avoidance=True, enable_blind_move=False, j1_use_fast_map=False, j2_use_fast_map=False)
+        
+        cmd.diag('text="Go_Home_All command finished."')
+        cmd.finish()
+        
+    def movetotarget(self,cmd):   
+        """ Move science fibres to certain place"""
+
+        mpshost=""
+        mpsport=8888
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Current_Position_X':[0,0],'Current_Position_Y':[0,1],\
+            'Target_Position_X':[10,20],'Target_Position_Y':[10,20], 'X_axes_Uncertainty':[0.2,0.2],\
+            'Y_axes_Uncertainty':[0.2,0.2],'Joint1_Delay_Count':[0,1],'Joint2_Delay_Count':[0,1],'fixed_arm':[0,0],\
+            'target_latched':[1,1]}
+        
+        telemetry=m.move_to_target(sequence_number=0, iteration_number=0, positions=p, obstacle_avoidance=0, enable_blind_move=0)
+        
+        telemetry=m.move_to_target(sequence_number=0, iteration_number=1, positions=p, obstacle_avoidance=0, enable_blind_move=0)
+        
+        
+        cmd.diag('text="Go_Home_All command finished."')
+        cmd.finish()    
+        
     def runmpstest(self, cmd):
         """Report status and version; obtain and send current data"""
         
@@ -76,7 +142,7 @@ class FpsCmd(object):
             f.write(datastring)
 
 
-        p={'Module_Id':[0,1],'Positioner_Id':[2,2],'Current_Position_X':[0,0],'Current_Position_Y':[0,1],\
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Current_Position_X':[0,0],'Current_Position_Y':[0,1],\
             'Target_Position_X':[10,20],'Target_Position_Y':[10,20], 'X_axes_Uncertainty':[0.2,0.2],\
             'Y_axes_Uncertainty':[0.2,0.2],'Joint1_Delay_Count':[0,1],'Joint2_Delay_Count':[0,1],'fixed_arm':[0,0],\
             'target_latched':[1,1]}
@@ -108,7 +174,6 @@ class FpsCmd(object):
 
     def targetPositions(self, fieldName):
         """ return the (x,y) cobra positions for the given field.
-
         Obviously, you'd fetch from some database...
         """
 
@@ -203,4 +268,3 @@ class FpsCmd(object):
   
             
         cmd.finish("text='FPS database initializing finished.'")
-          
