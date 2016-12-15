@@ -3,7 +3,7 @@ import base64
 import numpy
 import time
 import sys
-sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
+sys.path.append("~/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
                 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
