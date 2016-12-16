@@ -3,7 +3,7 @@ import base64
 import numpy
 import time
 import sys
-sys.path.append("~/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
+sys.path.append("$HOME/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
 
                 
 import opscore.protocols.keys as keys
@@ -131,6 +131,18 @@ class FpsCmd(object):
         
         cmd.diag('text="Go_Home_All command finished."')
         cmd.finish()    
+    
+    def runmpsdianostic(self,cmd):
+        """ Asking MPS to run system disnostic"""
+        
+        mpshost=""
+        mpsport=8888
+    
+        m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        m.run_diagnostic()
+        
+        cmd.diag('text="MPS dianostic command finished."')
+        cmd.finish()            
         
     def runmpstest(self, cmd):
         """Report status and version; obtain and send current data"""
