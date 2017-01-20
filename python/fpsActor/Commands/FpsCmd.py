@@ -2,8 +2,9 @@ import json
 import base64
 import numpy
 import time
+import psycopg2
 import sys
-sys.path.append("$HOME/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
+sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
 
                 
 import opscore.protocols.keys as keys
@@ -35,6 +36,7 @@ class FpsCmd(object):
             ('dbinit', '', self.dbinit),
             ('sendCommand', '', self.sendCommand),
             ('getResponse', '', self.getResponse),
+            ('runmpsdianostic', '', self.getResponse),
             ('runmpstest', '', self.runmpstest),
             ('gohomeall', '', self.gohomeall),
             ('movetotarget', '', self.movetotarget),
@@ -269,15 +271,18 @@ class FpsCmd(object):
             print "I am unable to connect to the database"
         
         cur = conn.cursor()
+        cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, f3c_x float8, f3c_y float8,"
+                                         "flag INT)")
+        
         cur.execute("CREATE TABLE FPS_INFO(runid VARCHAR(20) PRIMARY KEY," 
                                            "odometer INT, hst_time time, ut_time time," 
                                            "ra float8, dec float8, temp float4, fps_version VARCHAR(20),"
                                            "db_version VARCHAR(20))")  
         
-        cur.execute("CREATE TABLE MORTORMAP_INFO(fibre_id INT PRIMARY KEY, odometer INT, mortormap_version VARCHAR(20)"  
+        cur.execute("CREATE TABLE MORTORMAP_INFO(fibre_id INT PRIMARY KEY, odometer INT, mortormap_version VARCHAR(20),"  
                                            "mortormap_path VARCHAR(256), mortormap_date VARCHAR(20))") 
         
         conn.commit()
-  
+        conn.close()
             
         cmd.finish("text='FPS database initializing finished.'")
