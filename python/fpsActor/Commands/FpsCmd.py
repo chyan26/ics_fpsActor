@@ -16,6 +16,8 @@ from opscore.utility.qstr import qstr
 class FpsCmd(object):
     
     odometer=0
+    fieldid=0
+    f3ctarget=[]
     
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -29,17 +31,22 @@ class FpsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
-            ('setupField', 'fieldID', self.setupField),
-            ('setupOdometer', '<odo>', self.setupOdometer),
+            ('setField', 'fieldID', self.setField),
+            ('setOdometer', '<odo>', self.setOdometer),
+            ('getOdometer', '', self.getOdometer),
             ('testloop', '<cnt> [<expTime>]', self.testloop),
             ('home', '<cnt> [<expTime>]', self.home),
             ('dbinit', '', self.dbinit),
+            ('targetPositions', '', self.targetPositions),
             ('sendCommand', '', self.sendCommand),
             ('getResponse', '', self.getResponse),
             ('runmpsdianostic', '', self.getResponse),
             ('runmpstest', '', self.runmpstest),
             ('gohomeall', '', self.gohomeall),
             ('movetotarget', '', self.movetotarget),
+            ('movepositioner', '', self.movetpositioner),
+            ('gettelemetrydata', '', self.gettelemetrydata),
+            ('setcurrentposition', '', self.setcurrentposition),
 
         ]
 
@@ -123,17 +130,58 @@ class FpsCmd(object):
 
         p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Current_Position_X':[0,0],'Current_Position_Y':[0,1],\
             'Target_Position_X':[10,20],'Target_Position_Y':[10,20], 'X_axes_Uncertainty':[0.2,0.2],\
-            'Y_axes_Uncertainty':[0.2,0.2],'Joint1_Delay_Count':[0,1],'Joint2_Delay_Count':[0,1],'fixed_arm':[0,0],\
-            'target_latched':[1,1]}
+            'Y_axes_Uncertainty':[0.2,0.2],'Theta_Joint1_Delay_Count':[0,1],'Phi_Joint2_Delay_Count':[0,1],'Flags':[0,0]}
         
         telemetry=m.move_to_target(sequence_number=0, iteration_number=0, positions=p, obstacle_avoidance=0, enable_blind_move=0)
         
         telemetry=m.move_to_target(sequence_number=0, iteration_number=1, positions=p, obstacle_avoidance=0, enable_blind_move=0)
         
         
-        cmd.diag('text="Go_Home_All command finished."')
+        cmd.diag('text="MPS move_to_target command finished."')
         cmd.finish()    
-    
+        
+    def movepositioner(self,cmd):
+        """ Move positioner without collision checking. """
+        
+        mpshost=""
+        mpsport=8888
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Theta-Joint1':[10,20],'Phi-Joint2':[10,20],'Flags':[0,0]}
+        m=mps.move_positioner(p)
+        
+        cmd.diag('text="move_positioner command finished."')
+        cmd.finish()    
+        
+    def gettelemetrydata(self):
+        """ Getting telemetry data """
+        
+        mpshost=""
+        mpsport=8888
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2]}
+        
+        telemetry=m.get_telemetry_data(p)
+        
+        # Then, we can do something here
+        
+        cmd.diag('text="get_telemetry_data command finished."')
+        cmd.finish()  
+     
+    def setcurrentpositions(self):
+        """ Set current position """
+        mpshost=""
+        mpsport=8888
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Current_Position_X':[0,0],'Current_Position_Y':[0,1],'Flags':[0,0]}
+        m.set_current_position(p)
+            
+        cmd.diag('text="set_current_position command finished."')
+        cmd.finish()  
+        
     def runmpsdianostic(self,cmd):
         """ Asking MPS to run system disnostic"""
         
@@ -145,9 +193,20 @@ class FpsCmd(object):
         
         cmd.diag('text="MPS dianostic command finished."')
         cmd.finish()            
+    
+    def setpowerorreset(self,cmd):
+        
+        mpshost=""
+        mpsport=8888
+        m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        
+        m.set_power_or_reset(cmd, set_motor_freq, sectors)
+        
+        cmd.diag('text="MPS set_power_or_rest command finished."')
+        cmd.finish()
         
     def runmpstest(self, cmd):
-        """Report status and version; obtain and send current data"""
+        """Sequence of testing commands."""
         
         
         datastring=pfi.pack_mps_software(shutdown=False, restart=True, save_database=False)
@@ -159,8 +218,7 @@ class FpsCmd(object):
 
         p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Current_Position_X':[0,0],'Current_Position_Y':[0,1],\
             'Target_Position_X':[10,20],'Target_Position_Y':[10,20], 'X_axes_Uncertainty':[0.2,0.2],\
-            'Y_axes_Uncertainty':[0.2,0.2],'Joint1_Delay_Count':[0,1],'Joint2_Delay_Count':[0,1],'fixed_arm':[0,0],\
-            'target_latched':[1,1]}
+            'Y_axes_Uncertainty':[0.2,0.2],'Theta_Joint1_Delay_Count':[0,1],'Phi_Joint2_Delay_Count':[0,1],'Flags':[0,0]}
 
         datastring=pfi.pack_move_to_target(sequence_number=1, iteration_number=0, positions=p, obstacle_avoidance=0, enable_blind_move=0)
         fileName='pack_move_to_target.bin'
@@ -177,7 +235,7 @@ class FpsCmd(object):
         cmd.finish()
 
 
-    def setupField(self, cmd):
+    def setField(self, cmd):
         """ Fully configure all the fibers for the given field. """
 
         cmd.fail("text='Not yet implemented'")
@@ -192,9 +250,9 @@ class FpsCmd(object):
         Obviously, you'd fetch from some database...
         """
 
-        return numpy.random.random(9600).reshape(4800,2).astype('f4')
+        self.f3ctarget=numpy.random.random(5000).reshape(2500,2).astype('f4')
         
-        cmd.finish()
+        fieldName.finish()
         
     def testloop(self, cmd):
         """ Run the expose-move loop a few times. For development. """
@@ -254,16 +312,24 @@ class FpsCmd(object):
                                                             
         cmd.finish()
         
-    def setupOdometer(self, cmd):
+    def setOdometer(self, cmd):
         """Setting the odometer number and start a data base table."""
-        odometer = cmd.cmd.keywords["odo"].values[0]
-        cmd.inform('"odometer"= %d'%(odometer))
+        self.odometer = cmd.cmd.keywords["odo"].values[0]
+        cmd.inform('text="odometer = "%i'%(self.odometer))
 
         
         cmd.finish()
+    
+    def getOdometer(self, cmd):
+        """Getting the odometer number and start a data base table."""
+        #odometer = cmd.cmd.keywords["odo"].values[0]
+        cmd.inform('text="odometer = "%i'%(self.odometer))
+
+        
+        cmd.finish()    
         
     def dbinit(self, cmd):
-        """ Initializing the database.  """
+        """ Initializing the database tables.  """
   
         try:
             conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
@@ -271,18 +337,26 @@ class FpsCmd(object):
             print "I am unable to connect to the database"
         
         cur = conn.cursor()
-        cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, f3c_x float8, f3c_y float8,"
-                                         "flag INT)")
+        cur.execute("select * from information_schema.tables where table_name=%s", ('TARGET',))
+        if bool(cur.rowcount) is False:     
+            cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, f3c_x float8, f3c_y float8,"
+                        "flag INT)")
+            conn.commit()
+
+        cur.execute("select * from information_schema.tables where table_name=%s", ('FPS_INFO',))
+        if bool(cur.rowcount) is False:
+            cur.execute("CREATE TABLE FPS_INFO(runid VARCHAR(20) PRIMARY KEY," 
+                        "odometer INT, hst_time time, ut_time time," 
+                        "ra float8, dec float8, temp float4, fps_version VARCHAR(20),"
+                        "db_version VARCHAR(20))")  
+            conn.commit()
+
+        cur.execute("select * from information_schema.tables where table_name=%s", ('MORTORMAP_INFO',))
+        if bool(cur.rowcount) is False:
+            cur.execute("CREATE TABLE MORTORMAP_INFO(fibre_id INT PRIMARY KEY, odometer INT, mortormap_version VARCHAR(20),"  
+                        "mortormap_path VARCHAR(256), mortormap_date VARCHAR(20))") 
         
-        cur.execute("CREATE TABLE FPS_INFO(runid VARCHAR(20) PRIMARY KEY," 
-                                           "odometer INT, hst_time time, ut_time time," 
-                                           "ra float8, dec float8, temp float4, fps_version VARCHAR(20),"
-                                           "db_version VARCHAR(20))")  
-        
-        cur.execute("CREATE TABLE MORTORMAP_INFO(fibre_id INT PRIMARY KEY, odometer INT, mortormap_version VARCHAR(20),"  
-                                           "mortormap_path VARCHAR(256), mortormap_date VARCHAR(20))") 
-        
-        conn.commit()
+            conn.commit()
         conn.close()
             
         cmd.finish("text='FPS database initializing finished.'")
