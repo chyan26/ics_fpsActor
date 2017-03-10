@@ -40,13 +40,14 @@ class FpsCmd(object):
             ('targetPositions', '', self.targetPositions),
             ('sendCommand', '', self.sendCommand),
             ('getResponse', '', self.getResponse),
-            ('runmpsdianostic', '', self.getResponse),
+            ('runMPSdianostic', '', self.runMPSdianostic),
             ('runmpstest', '', self.runmpstest),
-            ('gohomeall', '', self.gohomeall),
-            ('movetotarget', '', self.movetotarget),
-            ('movepositioner', '', self.movetpositioner),
-            ('gettelemetrydata', '', self.gettelemetrydata),
-            ('setcurrentposition', '', self.setcurrentposition),
+            ('goHomeAll', '', self.goHomeAll),
+            ('moveToTarget', '', self.moveToTarget),
+            ('movePositioner', '', self.movetPositioner),
+            ('movePositionerdDelay', '', self.movetPositionerDelay),
+            ('gettelemetrydata', '', self.getTelemetryData),
+            ('setcurrentposition', '', self.setCurrentPosition),
 
         ]
 
@@ -108,7 +109,7 @@ class FpsCmd(object):
          cmd.diag('text="Sending command to MPS server finished."')
          cmd.finish()
 
-    def gohomeall(self,cmd):
+    def goHomeAll(self,cmd):
         """ Home all the science fibres """
             
         mpshost=""
@@ -120,7 +121,7 @@ class FpsCmd(object):
         cmd.diag('text="Go_Home_All command finished."')
         cmd.finish()
         
-    def movetotarget(self,cmd):   
+    def moveToTarget(self,cmd):   
         """ Move science fibres to certain place"""
 
         mpshost=""
@@ -140,7 +141,7 @@ class FpsCmd(object):
         cmd.diag('text="MPS move_to_target command finished."')
         cmd.finish()    
         
-    def movepositioner(self,cmd):
+    def movePositioner(self,cmd):
         """ Move positioner without collision checking. """
         
         mpshost=""
@@ -154,7 +155,23 @@ class FpsCmd(object):
         cmd.diag('text="move_positioner command finished."')
         cmd.finish()    
         
-    def gettelemetrydata(self):
+   def movePositioner(self,cmd):
+        """ Move positioner without collision checking. """
+        
+        mpshost=""
+        mpsport=8888
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Theta-Joint1':[10,-10],'Phi-Joint2':[10,-20],\
+           ,'Theta-Joint1-Delay':[10,20],'Phi-Joint2-Delay':[10,20],'Flags':[0,0]}
+        
+        m=mps.move_positioner_with_delay(p)
+        
+        cmd.diag('text="move_positioner command finished."')
+        cmd.finish()    
+        
+    def getTelemetryData(self):
         """ Getting telemetry data """
         
         mpshost=""
@@ -170,7 +187,7 @@ class FpsCmd(object):
         cmd.diag('text="get_telemetry_data command finished."')
         cmd.finish()  
      
-    def setcurrentpositions(self):
+    def setCurrentPositions(self):
         """ Set current position """
         mpshost=""
         mpsport=8888
@@ -182,7 +199,7 @@ class FpsCmd(object):
         cmd.diag('text="set_current_position command finished."')
         cmd.finish()  
         
-    def runmpsdianostic(self,cmd):
+    def runMPSdianostic(self,cmd):
         """ Asking MPS to run system disnostic"""
         
         mpshost=""
@@ -194,7 +211,7 @@ class FpsCmd(object):
         cmd.diag('text="MPS dianostic command finished."')
         cmd.finish()            
     
-    def setpowerorreset(self,cmd):
+    def setPowerOrReset(self,cmd):
         
         mpshost=""
         mpsport=8888
