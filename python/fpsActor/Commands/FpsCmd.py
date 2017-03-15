@@ -46,8 +46,9 @@ class FpsCmd(object):
             ('moveToTarget', '', self.moveToTarget),
             ('movePositioner', '', self.movetPositioner),
             ('movePositionerdDelay', '', self.movetPositionerDelay),
-            ('gettelemetrydata', '', self.getTelemetryData),
-            ('setcurrentposition', '', self.setCurrentPosition),
+            ('getTelemetryData', '', self.getTelemetryData),
+            ('setHardstopOrientation', '', self.setHardstopOrientation),
+            ('setCurrentPosition', '', self.setCurrentPosition),
 
         ]
 
@@ -220,6 +221,20 @@ class FpsCmd(object):
         m.set_power_or_reset(cmd, set_motor_freq, sectors)
         
         cmd.diag('text="MPS set_power_or_rest command finished."')
+        cmd.finish()
+        
+    def setHardstopOrientation(self,cmd):
+        
+        mpshost=""
+        mpsport=8888
+        m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'HardStop Orientation':[0,0]}
+
+        
+        m.Set_HardStop_Orientation(p)
+        
+        cmd.diag('text="MPS set_HardStop_Orientation command finished."')
         cmd.finish()
         
     def runmpstest(self, cmd):
