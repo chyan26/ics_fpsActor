@@ -4,6 +4,7 @@ import numpy
 import time
 import psycopg2
 import sys
+import xml.etree.ElementTree
 sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
 
                 
@@ -40,12 +41,20 @@ class FpsCmd(object):
             ('targetPositions', '', self.targetPositions),
             ('sendCommand', '', self.sendCommand),
             ('getResponse', '', self.getResponse),
+            ('getStatusCommand','',self.getStatusCommand),
+            ('getDatabaseData','',self.getDatabaseData),
+            ('setDatabaseData','',self.setDatabaseData),
+            ('exportDatabasetoXMLFile','',self.exportDatabasetoXMLFile),
+            ('importDatabasefromXMLFile','',self.importDatabasefromXMLFile),            
             ('runMPSdianostic', '', self.runMPSdianostic),
             ('runmpstest', '', self.runmpstest),
             ('goHomeAll', '', self.goHomeAll),
             ('moveToTarget', '', self.moveToTarget),
             ('movePositioner', '', self.movetPositioner),
-            ('movePositionerdDelay', '', self.movetPositionerDelay),
+            ('movePositionerdwithDelay', '', self.movetPositionerwithDelay),
+            ('movePositionerdIntervalDuration', '', self.movePositionerdIntervalDuration),
+            ('calibrateMortorFreq','',self.calibrateMortorFreq),
+            ('mpsSoftware','',self.mpsSoftware),
             ('getTelemetryData', '', self.getTelemetryData),
             ('setHardstopOrientation', '', self.setHardstopOrientation),
             ('setCurrentPosition', '', self.setCurrentPosition),
@@ -109,6 +118,25 @@ class FpsCmd(object):
          
          cmd.diag('text="Sending command to MPS server finished."')
          cmd.finish()
+         
+    def getStatusCommand(self,cmd):
+         """ Get current status data """
+         cmd.diag('text="Sending command to MPS server."')
+     
+         mpshost=""
+         mpsport=8888
+         
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+         
+         m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+         
+         p={'Module_Id':[1,2],'Positioner_Id':[2,2]}         
+         data=m.get_status_command(p)
+         
+         
+         
+         cmd.diag('text="getStatusCommand command to MPS server finished."')
+         cmd.finish()
 
     def goHomeAll(self,cmd):
         """ Home all the science fibres """
@@ -142,6 +170,22 @@ class FpsCmd(object):
         cmd.diag('text="MPS move_to_target command finished."')
         cmd.finish()    
         
+    def calibrateMortorFreq(self,cmd):
+        """ Calibrate mortor frqeuency. """
+        
+        mpshost=""
+        mpsport=8888
+
+        
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Theta-Joint1 Start Frequency':[10,20],'Theta-Joint1 End Frequency':[10,20],\
+                'Phi-Joint2 Start Frequency':[10,20],'Phi-Joint2 End Frequency':[10,20],'Flags':[0,0]}
+    
+
+        m=mps.calibrate_motor_frequencies(p)
+            
+        cmd.diag('text="calibrateMortorFreq command finished."')
+        cmd.finish()    
+
     def movePositioner(self,cmd):
         """ Move positioner without collision checking. """
         
@@ -156,7 +200,7 @@ class FpsCmd(object):
         cmd.diag('text="move_positioner command finished."')
         cmd.finish()    
         
-   def movePositioner(self,cmd):
+    def movePositionerwithDelay(self,cmd):
         """ Move positioner without collision checking. """
         
         mpshost=""
@@ -164,12 +208,28 @@ class FpsCmd(object):
         
         #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
 
-        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Theta-Joint1':[10,-10],'Phi-Joint2':[10,-20],\
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Theta-Joint1':[10,-10],'Phi-Joint2':[10,-20]\
            ,'Theta-Joint1-Delay':[10,20],'Phi-Joint2-Delay':[10,20],'Flags':[0,0]}
         
         m=mps.move_positioner_with_delay(p)
         
         cmd.diag('text="move_positioner command finished."')
+        cmd.finish()    
+    
+    def movePositionerIntervalDuration(self,cmd):
+        """ Move one or more positioners with interval and duration. """
+        
+        mpshost=""
+        mpsport=8888
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2],'Theta-Joint1':[10,-20],'Theta-Joint1 Interval':[10,20],'Theta-Joint1 Duration':[10,20],\
+                'Phi-Joint2':[-10,20],'Phi-Joint2 Interval':[10,20],'Phi-Joint2 Duration':[10,20],'Flags':[0,0]}
+        
+        m=mps.move_positioner_interval_duration(p)
+        
+        cmd.diag('text="movePositionerIntervalDuration command finished."')
         cmd.finish()    
         
     def getTelemetryData(self):
@@ -187,8 +247,75 @@ class FpsCmd(object):
         
         cmd.diag('text="get_telemetry_data command finished."')
         cmd.finish()  
-     
-    def setCurrentPositions(self):
+    
+    def getDatabaseData(self,cmd):
+        """ Get current database data """
+        
+        mpshost=""
+        mpsport=8888
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2]}
+        
+        record=m.get_database_data(p)
+        
+        # Then, we can do something here
+        
+        cmd.diag('text="getDatabaseData command finished."')
+        cmd.finish()  
+
+    def setDatabaseData(self,cmd):
+        """ Set current database data """
+        
+        mpshost=""
+        mpsport=8888
+        
+        # Fetching XML data from some where
+        
+        xml=xml.etree.ElementTree.parse('thefile.xml').getroot()
+        
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2]}
+        
+        result=m.set_database_data(xml,save_database=True)
+        
+        # Then, we can do something here
+        
+        cmd.diag('text="setDatabaseData command finished."')
+        cmd.finish()  
+ 
+    def exportDatabasetoXMLFile(self,cmd):
+        
+        mpshost=""
+        mpsport=8888
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        
+        
+        p={'Module_Id':[1,2],'Positioner_Id':[2,2]}
+        
+        result=m.import_database_from_xml_file(xmldata,p)
+        
+        
+        cmd.diag('text="importDatabasefromXMLFile command finished."')
+        cmd.finish()      
+ 
+    def importDatabasefromXMLFile(self,cmd):
+        
+        mpshost=""
+        mpsport=8888
+        #m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
+        
+        
+        xmlfile='test.xml'
+        xml=xml.etree.ElementTree.parse(xmlfile).getroot()
+        
+        result=m.import_database_from_xml_file(xml,save_database=True)
+        
+        
+        cmd.diag('text="importDatabasefromXMLFile command finished."')
+        cmd.finish()  
+   
+    def setCurrentPositions(self,cmd):
         """ Set current position """
         mpshost=""
         mpsport=8888
@@ -236,6 +363,15 @@ class FpsCmd(object):
         
         cmd.diag('text="MPS set_HardStop_Orientation command finished."')
         cmd.finish()
+        
+    def mpsSoftware(self,cmd):
+        """ Shutdown or restart the MPS software"""
+        
+        datastring=pfi.pack_mps_software(shutdown=False, restart=True, save_database=False)
+        
+        cmd.diag('text="MPS set_HardStop_Orientation command finished."')
+        cmd.finish()
+     
         
     def runmpstest(self, cmd):
         """Sequence of testing commands."""
