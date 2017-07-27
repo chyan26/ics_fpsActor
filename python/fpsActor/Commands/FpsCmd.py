@@ -505,10 +505,24 @@ class FpsCmd(object):
             print "I am unable to connect to the database"
         
         cur = conn.cursor()
+        cur.execute("select * from information_schema.tables where table_name=%s", ('MPA',))
+        if bool(cur.rowcount) is False:     
+            cur.execute("CREATE TABLE TARGET(field_id VARCHAR(20), fid int, mortormap_version VARCHAR(20), el_parameter int,"
+                        "home_direction INT)")
+            conn.commit()
+            
+        cur = conn.cursor()
+        cur.execute("select * from information_schema.tables where table_name=%s", ('EL_INFO',))
+        if bool(cur.rowcount) is False:     
+            cur.execute("CREATE TABLE TARGET(field_id VARCHAR(20), fid int, ra float8, dec float8,"
+                        "center_f3c float8[2], center_mcs float8[2], target_f3c float8[2], target_mcs float8[2], flag INT)")
+            conn.commit()
+        
+        cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('TARGET',))
         if bool(cur.rowcount) is False:     
-            cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, f3c_x float8, f3c_y float8,"
-                        "flag INT)")
+            cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, cid int, home_f3c float8[2], home_mcs float8[2],"
+                        "center_f3c float8[2], center_mcs float8[2], target_f3c float8[2], target_mcs float8[2], flag INT)")
             conn.commit()
 
         cur.execute("select * from information_schema.tables where table_name=%s", ('FPS_INFO',))
