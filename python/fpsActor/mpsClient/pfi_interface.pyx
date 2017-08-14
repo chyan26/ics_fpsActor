@@ -93,6 +93,17 @@ cdef isValid_Mps_Response(Response_Id):
 	else:
 		return False
 
+cdef isValid_Mps_Response(Response_Id):
+	if Response_Id == Command_Response_ID:
+		return True
+	elif Response_Id == Send_Database_Data_ID:
+		return True
+	elif Response_Id == Send_Telemetry_Data_ID:
+		return True
+	else:
+		return False
+
+
 
 def parse_command_response(resp):
 	cdef:

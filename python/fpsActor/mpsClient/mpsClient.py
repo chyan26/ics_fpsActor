@@ -35,7 +35,7 @@ class MPSClient:
 		# get command response
 		response_header = self.get_response(pfi.header_size)
 		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
-		if cmd_id != Command_Response_ID:
+		if cmd_id != pfi.Command_Response_ID:
 			raise MPSError("Message header ID error: %d" % cmd_id)
 		response_message = self.get_response(body_size)
 		status, errStr = pfi.parse_command_response(response_message)
