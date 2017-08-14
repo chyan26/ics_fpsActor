@@ -11,11 +11,14 @@ sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 import pfi_interface as pfi
+import mpsClient as mps
 
 from opscore.utility.qstr import qstr
 
 class FpsCmd(object):
     
+    mpshost="140.109.177.86"
+    mpsport=4201
     odometer=0
     fieldid=0
     f3ctarget=[]
@@ -146,7 +149,7 @@ class FpsCmd(object):
         
         m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
         telemetry=m.go_home_all(obstacle_avoidance=True, enable_blind_move=False, j1_use_fast_map=False, j2_use_fast_map=False)
-        
+
         cmd.diag('text="Go_Home_All command finished."')
         cmd.finish()
         
@@ -352,8 +355,8 @@ class FpsCmd(object):
         
     def setHardstopOrientation(self,cmd):
         
-        mpshost=""
-        mpsport=8888
+        mpshost=mpshost
+        mpsport=mpsport
         m=mps.MPSClient(host=mpshost,port=mpsport,command_header_counter=0)
         
         p={'Module_Id':[1,2],'Positioner_Id':[2,2],'HardStop Orientation':[0,0]}
