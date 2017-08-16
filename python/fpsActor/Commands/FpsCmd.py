@@ -38,6 +38,7 @@ class FpsCmd(object):
             ('setField', 'fieldID', self.setField),
             ('setOdometer', '<odo>', self.setOdometer),
             ('getOdometer', '', self.getOdometer),
+            ('cameraExpLoop', '', self.cameraExpLoop),
             ('testloop', '<cnt> [<expTime>]', self.testloop),
             ('home', '<cnt> [<expTime>]', self.home),
             ('dbinit', '', self.dbinit),
@@ -53,8 +54,8 @@ class FpsCmd(object):
             ('runmpstest', '', self.runmpstest),
             ('goHomeAll', '', self.goHomeAll),
             ('moveToTarget', '', self.moveToTarget),
-            ('movePositioner', '', self.movetPositioner),
-            ('movePositionerdwithDelay', '', self.movetPositionerwithDelay),
+            ('movePositioner', '', self.movePositioner),
+            ('movetPositionerwithDelay', '', self.movetPositionerwithDelay),
             ('movePositionerdIntervalDuration', '', self.movePositionerdIntervalDuration),
             ('calibrateMortorFreq','',self.calibrateMortorFreq),
             ('mpsSoftware','',self.mpsSoftware),
@@ -203,7 +204,7 @@ class FpsCmd(object):
         cmd.diag('text="move_positioner command finished."')
         cmd.finish()    
         
-    def movePositionerwithDelay(self,cmd):
+    def movetPositionerwithDelay(self,cmd):
         """ Move positioner without collision checking. """
         
         mpshost=""
@@ -219,7 +220,7 @@ class FpsCmd(object):
         cmd.diag('text="move_positioner command finished."')
         cmd.finish()    
     
-    def movePositionerIntervalDuration(self,cmd):
+    def movePositionerdIntervalDuration(self,cmd):
         """ Move one or more positioners with interval and duration. """
         
         mpshost=""
@@ -318,7 +319,7 @@ class FpsCmd(object):
         cmd.diag('text="importDatabasefromXMLFile command finished."')
         cmd.finish()  
    
-    def setCurrentPositions(self,cmd):
+    def setCurrentPosition(self,cmd):
         """ Set current position """
         mpshost=""
         mpsport=8888
@@ -424,6 +425,12 @@ class FpsCmd(object):
         self.f3ctarget=numpy.random.random(5000).reshape(2500,2).astype('f4')
         
         fieldName.finish()
+    
+    def cameraExpLoop(self,cmd):
+        """ Camera Loop Test. """
+    
+    
+        cmd.finish()
         
     def testloop(self, cmd):
         """ Run the expose-move loop a few times. For development. """
@@ -510,8 +517,8 @@ class FpsCmd(object):
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('MPA',))
         if bool(cur.rowcount) is False:     
-            cur.execute("CREATE TABLE TARGET(field_id VARCHAR(20), fid int, mortormap_version VARCHAR(20), el_parameter int,"
-                        "home_direction INT)")
+            cur.execute("CREATE TABLE TARGET(field_id VARCHAR(20), fid int, ra float8, dec float8,"
+                        "target_f3c float8[2], target_flag int)")
             conn.commit()
             
         cur = conn.cursor()
@@ -524,8 +531,8 @@ class FpsCmd(object):
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('TARGET',))
         if bool(cur.rowcount) is False:     
-            cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, cid int, home_f3c float8[2], home_mcs float8[2],"
-                        "center_f3c float8[2], center_mcs float8[2], target_f3c float8[2], target_mcs float8[2], flag INT)")
+            cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, cid int, local_time time, "
+                        "rotate_angle float, telescope_el float, system_temperture float, software_version string, db_version string)")
             conn.commit()
 
         cur.execute("select * from information_schema.tables where table_name=%s", ('FPS_INFO',))
@@ -534,6 +541,21 @@ class FpsCmd(object):
                         "odometer INT, hst_time time, ut_time time," 
                         "ra float8, dec float8, temp float4, fps_version VARCHAR(20),"
                         "db_version VARCHAR(20))")  
+            conn.commit()
+        
+        cur.execute("select * from information_schema.tables where table_name=%s", ('ITERATION',))
+        if bool(cur.rowcount) is False:
+            cur.execute("CREATE TABLE ITERATION(iid int, fid int, odometer INT, local_time time, " 
+                        "target_f3c float8[2], target_mcs float8[2], current_f3c float8[2], current_mcs float8[2]," 
+                        "cobra_phi float, cobra_theta float, fwhm_x float, fwhm_y float, angle float, flux float,"
+                        "on-source int, sn_quality float, collision_flag int)")  
+            conn.commit()
+        
+        cur.execute("select * from information_schema.tables where table_name=%s", ('COBRA_INFO',))
+        if bool(cur.rowcount) is False:
+            cur.execute("CREATE TABLE COBRA_INFO(module_id int, fid int, config_if INT, position_x float, position_y float, " 
+                        "stage1_r float, stage2_r float, thetaCCW_limit float, thetaCW_limit float, phiCCW_limit float," 
+                        "phiCW_limit float, dot_x float, dot_y flaot)")
             conn.commit()
 
         cur.execute("select * from information_schema.tables where table_name=%s", ('MORTORMAP_INFO',))
