@@ -1,6 +1,6 @@
 """PFI - MPS interface"""
 
-# 
+#
 # Designed By: ChihYi Wen
 # ASIAA - 2015
 #
@@ -93,16 +93,23 @@ cdef isValid_Mps_Response(Response_Id):
 	else:
 		return False
 
-cdef isValid_Mps_Response(Response_Id):
+def isCommand_Response(Response_Id):
 	if Response_Id == Command_Response_ID:
-		return True
-	elif Response_Id == Send_Database_Data_ID:
-		return True
-	elif Response_Id == Send_Telemetry_Data_ID:
 		return True
 	else:
 		return False
 
+def isSend_Database_Data(Response_Id):
+	if Response_Id == Send_Database_Data_ID:
+		return True
+	else:
+		return False
+
+def isSend_Telemetry_Data(Response_Id):
+	if Response_Id == Send_Telemetry_Data_ID:
+		return True
+	else:
+		return False
 
 
 def parse_command_response(resp):
@@ -355,11 +362,11 @@ def pack_mps_software(shutdown, restart, save_database):
 
 	Mps_Software_Command.Msg_Record.Command_Flags = 0x0
 	if save_database:
-		Mps_Software_Command.Msg_Record.Command_Flags |= BIT_Save_The_Database; 
+		Mps_Software_Command.Msg_Record.Command_Flags |= BIT_Save_The_Database;
 	if shutdown:
-		Mps_Software_Command.Msg_Record.Command_Flags |= BIT_Shut_Down; 
+		Mps_Software_Command.Msg_Record.Command_Flags |= BIT_Shut_Down;
 	if restart:
-		Mps_Software_Command.Msg_Record.Command_Flags |= BIT_Re_Start; 
+		Mps_Software_Command.Msg_Record.Command_Flags |= BIT_Re_Start;
 
 	cp = <char *> &Mps_Software_Command
 	return cp[:sizeof(mps_software_command)]

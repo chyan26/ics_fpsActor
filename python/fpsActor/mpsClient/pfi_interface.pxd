@@ -1,6 +1,6 @@
 """PFI - MPS interface"""
 
-# 
+#
 # Designed By: ChihYi Wen
 # ASIAA - 2015
 #
@@ -299,8 +299,8 @@ cdef extern from "pfi_interface_defs.h" nogil:
 	struct current_positioner_msg_record:
 		uint32_t Module_Id
 		uint32_t Positioner_Id
-		double Postion_X
-		double Postion_Y
+		double Position_X
+		double Position_Y
 		uint32_t Flags
 
 	struct set_current_position_data_command:
@@ -550,4 +550,3 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		uint32_t Slow_Phi_Joint2_CCW_Region_Count
 		double Slow_Phi_Joint2_CCW_Regions[CAL_COL_SIZE]
 		double Slow_Phi_Joint2_CCW_Step_Sizes[CAL_COL_SIZE]
-

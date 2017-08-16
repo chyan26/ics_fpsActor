@@ -532,10 +532,9 @@ struct current_positioner_msg_record
 {
 	UInt32	Module_Id;
 	UInt32	Positioner_Id;
-	Float64	Postion_X;
-	Float64	Postion_Y;
+	Float64	Position_X;
+	Float64	Position_Y;
 	UInt32	Flags;
-
 };
 
 
@@ -559,7 +558,7 @@ struct mps_software_record
 struct mps_software_command
 {
 	struct command_header		Command_Header;
-	struct mps_software_record	Msg_Record; 
+	struct mps_software_record	Msg_Record;
 };
 
 
@@ -766,7 +765,7 @@ struct send_diagnostic_telemetry_data
 //DataBase Ids
 
 
-#define	Positioner_serial_number_Id			(1)	
+#define	Positioner_serial_number_Id			(1)
 
 #define	Base_Position_X_Id					(2)
 #define	Base_Position_Y_Id					(3)
@@ -834,18 +833,18 @@ struct send_diagnostic_telemetry_data
 
 struct database_info
 {
-	UInt32	Positioner_serial_number;	
-	
+	UInt32	Positioner_serial_number;
+
 	Float64	Base_Position_X;
 	Float64	Base_Position_Y;
 	Float64	Base_Orientation;
-	
+
 	Float64	Theta_Joint1_CW_Angle_limit;
 	Float64	Theta_Joint1_CCW_Angle_limit;
-	
+
 	Float64	Phi_Joint2_CW_Angle_limit;
 	Float64	Phi_Joint2_CCW_Angle_limit;
-	
+
 	Float64	Theta_Joint1_transition_angle;
 	Float64	Phi_Joint2_transition_angle;
 
@@ -910,5 +909,3 @@ struct database_info
 /*-----------------------------------------------------------*/
 /*----------------------- Functions -------------------------*/
 /*-----------------------------------------------------------*/
-
-
