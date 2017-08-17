@@ -589,7 +589,7 @@ def pack_set_database_data(xml_data, savedatabase):
 
 	Set_Database_Data.Msg_Record.Xml_File_Size = len(xml_data)
 	for i in range(len(xml_data)):
-		Set_Database_Data.Msg_Record.Xml_File_Data[i] = xml_data[i]
+		Set_Database_Data.Msg_Record.Xml_File_Data[i] = ord(xml_data[i])
 
 	cp = <char *> &Set_Database_Data
 	return cp[:cmd_size]
@@ -617,7 +617,7 @@ def pack_import_database_from_xml_file(xml_data, savedatabase):
 
 	Import_Xml.FileInfo.Name_Length = len(xml_data)
 	for i in range(len(xml_data)):
-		Import_Xml.FileInfo.Name[i] = xml_data[i]
+		Import_Xml.FileInfo.Name[i] = ord(xml_data[i])
 
 	cp = <char *> &Import_Xml
 	return cp[:cmd_size]
@@ -646,7 +646,7 @@ def pack_export_database_to_xml_file(xml_data, positions):
 
 	Export_Xml.FileInfo.Name_Length = len(xml_data)
 	for i in range(len(xml_data)):
-		Export_Xml.FileInfo.Name[i] = xml_data[i]
+		Export_Xml.FileInfo.Name[i] = ord(xml_data[i])
 
 	for i in range(npos):
 		Export_Xml.Msg_Record[i].Module_Id = positions['Module_Id'][i]

@@ -59,7 +59,7 @@ typedef char UChar;
 #define	MAX_ERROR_STRING_SIZE	(1024*64)
 
 
-#define SET_DATABASE_DATA_MAX_SIZE	(1024*1024*48)
+#define SET_DATABASE_DATA_MAX_SIZE	(1024*1024*6)
 
 
 #define CAL_COL_SIZE	(200)//must match define in pfi_arm_ctrl.h
