@@ -130,10 +130,12 @@ typedef char UChar;
 
 #define Set_Power_or_Reset_ID				(217)
 #define Run_Diagnostic_ID					(218)
+#define Create_Log_Directory_ID				(219)
 
 
 /////////////////////
 //MPS response to Pfi IDS
+#define CommandValidate_Response_ID		(304)
 #define Command_Response_ID		(300)
 #define Send_Database_Data_ID	(301)
 #define Send_Telemetry_Data_ID	(302)
@@ -623,6 +625,18 @@ struct diagnostic_command
 	struct command_header	Command_Header;
 };
 
+////////////////////////////////////////////////////////////
+struct create_log_directory_msg_record
+{
+	UInt32  Directory_Name_Size;
+	UChar   Directory_Name[1024];//max
+};
+
+struct create_log_directory_command
+{
+	struct command_header					Command_Header;
+	struct create_log_directory_msg_record	Msg_Record;
+};
 
 
 

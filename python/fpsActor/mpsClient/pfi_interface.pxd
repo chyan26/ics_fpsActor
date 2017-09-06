@@ -81,8 +81,10 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		Set_HardStop_Orientation_ID
 		Set_Power_or_Reset_ID
 		Run_Diagnostic_ID
+		Create_Log_Directory_ID
 
 		#MPS response to Pfi IDS
+		CommandValidate_Response_ID
 		Command_Response_ID
 		Send_Database_Data_ID
 		Send_Telemetry_Data_ID
@@ -349,6 +351,16 @@ cdef extern from "pfi_interface_defs.h" nogil:
 
 	struct diagnostic_command:
 		command_header Command_Header
+
+	#Create_Log_Directory_ID
+
+	struct create_log_directory_msg_record:
+		uint32_t Directory_Name_Size
+		char Directory_Name[1024]
+
+	struct create_log_directory_command:
+		command_header Command_Header
+		create_log_directory_msg_record Msg_Record
 
 	#Execution Time data structure
 

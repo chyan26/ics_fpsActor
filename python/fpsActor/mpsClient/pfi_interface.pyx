@@ -27,6 +27,7 @@ def pack_go_home_all(obstacle_avoidance, enable_blind_move, j1_use_fast_map, j2_
 	cdef go_home_all_command Go_Home_All
 	cdef char *cp
 
+	command_header_counter += 1
 	Go_Home_All.Command_Header.Command_Id = Go_Home_All_ID
 	Go_Home_All.Command_Header.Message_Size = sizeof(command_header) + sizeof(go_home_all_msg_record)
 
@@ -34,7 +35,6 @@ def pack_go_home_all(obstacle_avoidance, enable_blind_move, j1_use_fast_map, j2_
 	Go_Home_All.Command_Header.Time_Stamp1 = int(now)
 	Go_Home_All.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Go_Home_All.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 
 	Go_Home_All.Command_Header.Flags = BIT_Step_Count
 
@@ -62,7 +62,7 @@ def parse_msg_header_response(resp):
 		int cmd_id, cmd_counter, body_size
 		unsigned char[:] buf
 
-	buf = bytearray(resp)
+	buf = resp
 	pHeader = <command_header *> &buf[0]
 	cmd_id = pHeader.Command_Id
 	cmd_counter = pHeader.Command_Counter
@@ -73,22 +73,14 @@ def parse_msg_header_response(resp):
 	      % (cmd_id, pHeader.Message_Size, pHeader.Time_Stamp1,
 	         pHeader.Time_Stamp2, cmd_counter, pHeader.Flags)
 
-	if not isValid_Mps_Response(cmd_id):
-		print "Parse_Header_Response() ==>> MSG_HEADER_ID_ERROR"
-		return (-1, 0, 0)
-	elif cmd_counter + 1 != command_header_counter:
-		print "Parse_Mps_Response() ==>> Command_Counter mismatched"
+	if cmd_counter != command_header_counter:
+		print "Parse_Mps_Response() ==>> Command_Counter mismatched %d!=%d" % (cmd_counter, command_header_counter)
 		return (-1, 0, 0)
 	else:
 		return (cmd_id, cmd_counter, body_size)
 
-
-cdef isValid_Mps_Response(Response_Id):
-	if Response_Id == Command_Response_ID:
-		return True
-	elif Response_Id == Send_Database_Data_ID:
-		return True
-	elif Response_Id == Send_Telemetry_Data_ID:
+def isCommandValidate_Response(Response_Id):
+	if Response_Id == CommandValidate_Response_ID:
 		return True
 	else:
 		return False
@@ -119,7 +111,7 @@ def parse_command_response(resp):
 		char *errStr
 		unsigned char[:] buf
 
-	buf = bytearray(resp)
+	buf = resp
 	pData = <command_response_error *> &buf[0];
 	status = pData.StatusNumber
 	sz = pData.Error_String_Size
@@ -136,7 +128,7 @@ def parse_send_database_data(resp):
 	cdef unsigned char *cp
 	cdef unsigned char[:] buf
 
-	buf = bytearray(resp)
+	buf = resp
 	cp = &buf[0]
 	pUsi = <uint32_t *> cp
 	sz = pUsi[0]
@@ -152,7 +144,7 @@ def parse_send_telemetry_data(resp):
 	cdef send_telemetry_data_record *p_telemetry_data_record
 	cdef unsigned char[:] buf
 
-	buf = bytearray(resp)
+	buf = resp
 	p_exec_time = <execution_time_data *> &buf[index]
 	exec_time = {}
 	exec_time['Mps_Command_Receive_Time'] = p_exec_time.Mps_Command_Receive_Time
@@ -259,6 +251,7 @@ def pack_move_to_target(sequence_number, iteration_number, positions, obstacle_a
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Move_To_Target.Command_Header.Command_Id = Move_To_Target_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(move_to_target_msg_header) + \
@@ -269,7 +262,6 @@ def pack_move_to_target(sequence_number, iteration_number, positions, obstacle_a
 	Move_To_Target.Command_Header.Time_Stamp1 = int(now)
 	Move_To_Target.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Move_To_Target.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Move_To_Target.Command_Header.Flags = 0x0
 
 	Move_To_Target.Msg_Header.Sequnce_Number = sequence_number
@@ -312,6 +304,7 @@ def pack_calibrate_motor_frequencies(targets):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Calibrate.Command_Header.Command_Id = Calibrate_Motor_Frequencies_ID
 	npos = len(targets['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -322,7 +315,6 @@ def pack_calibrate_motor_frequencies(targets):
 	Calibrate.Command_Header.Time_Stamp1 = int(now)
 	Calibrate.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Calibrate.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Calibrate.Command_Header.Flags = 0x0
 
 	Calibrate.Msg_Header.Number_Of_Records = npos
@@ -350,6 +342,7 @@ def pack_mps_software(shutdown, restart, save_database):
 	cdef mps_software_command Mps_Software_Command
 	cdef char *cp
 
+	command_header_counter += 1
 	Mps_Software_Command.Command_Header.Command_Id = Mps_Software_ID
 	Mps_Software_Command.Command_Header.Message_Size = sizeof(mps_software_command)
 
@@ -357,7 +350,6 @@ def pack_mps_software(shutdown, restart, save_database):
 	Mps_Software_Command.Command_Header.Time_Stamp1 = int(now)
 	Mps_Software_Command.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Mps_Software_Command.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Mps_Software_Command.Command_Header.Flags = 0x0
 
 	Mps_Software_Command.Msg_Record.Command_Flags = 0x0
@@ -378,6 +370,7 @@ def pack_get_telemetry_data(positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Get_Telemetry.Command_Header.Command_Id = Get_Telemetry_Data_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -388,7 +381,6 @@ def pack_get_telemetry_data(positions):
 	Get_Telemetry.Command_Header.Time_Stamp1 = int(now)
 	Get_Telemetry.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Get_Telemetry.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Get_Telemetry.Command_Header.Flags = 0x0
 
 	Get_Telemetry.Msg_Header.Number_Of_Records = npos
@@ -407,6 +399,7 @@ def pack_set_current_position(positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Set_Current_Position.Command_Header.Command_Id = Set_Current_Position_Data_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -417,7 +410,6 @@ def pack_set_current_position(positions):
 	Set_Current_Position.Command_Header.Time_Stamp1 = int(now)
 	Set_Current_Position.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Set_Current_Position.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Set_Current_Position.Command_Header.Flags = 0x0
 
 	Set_Current_Position.Msg_Header.Number_Of_Records = npos
@@ -442,6 +434,7 @@ def pack_move_positioner(positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Move_Positioner_command.Command_Header.Command_Id = Move_Positoner_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -452,7 +445,6 @@ def pack_move_positioner(positions):
 	Move_Positioner_command.Command_Header.Time_Stamp1 = int(now)
 	Move_Positioner_command.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Move_Positioner_command.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Move_Positioner_command.Command_Header.Flags = BIT_Step_Count
 
 	Move_Positioner_command.Msg_Header.Number_Of_Records = npos
@@ -474,6 +466,7 @@ def pack_move_positioner_interval_duration(positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Move_Positioner_Int_Dur.Command_Header.Command_Id = Move_Positoner_Interval_Duration_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -484,7 +477,6 @@ def pack_move_positioner_interval_duration(positions):
 	Move_Positioner_Int_Dur.Command_Header.Time_Stamp1 = int(now)
 	Move_Positioner_Int_Dur.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Move_Positioner_Int_Dur.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Move_Positioner_Int_Dur.Command_Header.Flags = BIT_Step_Count
 
 	Move_Positioner_Int_Dur.Msg_Header.Number_Of_Records = npos
@@ -510,6 +502,7 @@ def pack_move_positioner_with_delay(positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Move_Positioner_With_Delay.Command_Header.Command_Id = Move_Positoner_With_Delay_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -520,7 +513,6 @@ def pack_move_positioner_with_delay(positions):
 	Move_Positioner_With_Delay.Command_Header.Time_Stamp1 = int(now)
 	Move_Positioner_With_Delay.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Move_Positioner_With_Delay.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Move_Positioner_With_Delay.Command_Header.Flags = BIT_Step_Count
 
 	Move_Positioner_With_Delay.Msg_Header.Number_Of_Records = npos
@@ -544,6 +536,7 @@ def pack_get_database_data(positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Get_Database_Data.Command_Header.Command_Id = Get_Database_Data_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -554,7 +547,6 @@ def pack_get_database_data(positions):
 	Get_Database_Data.Command_Header.Time_Stamp1 = int(now)
 	Get_Database_Data.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Get_Database_Data.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Get_Database_Data.Command_Header.Flags = 0x0
 
 	Get_Database_Data.Msg_Header.Number_Of_Records = npos
@@ -573,6 +565,7 @@ def pack_set_database_data(xml_data, savedatabase):
 	cdef char *cp
 	cdef int cmd_size, i
 
+	command_header_counter += 1
 	Set_Database_Data.Command_Header.Command_Id = Set_Database_Data_ID
 	cmd_size = sizeof(command_header) + sizeof(uint32_t) + len(xml_data)
 	Set_Database_Data.Command_Header.Message_Size = cmd_size
@@ -581,7 +574,6 @@ def pack_set_database_data(xml_data, savedatabase):
 	Set_Database_Data.Command_Header.Time_Stamp1 = int(now)
 	Set_Database_Data.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Set_Database_Data.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	if savedatabase:
 		Set_Database_Data.Command_Header.Flags = BIT_Save_The_Database
 	else:
@@ -601,6 +593,7 @@ def pack_import_database_from_xml_file(xml_data, savedatabase):
 	cdef char *cp
 	cdef int cmd_size, i
 
+	command_header_counter += 1
 	Import_Xml.Command_Header.Command_Id = Import_Database_From_Xml_File_ID
 	cmd_size = sizeof(command_header) + sizeof(uint32_t) + len(xml_data)
 	Import_Xml.Command_Header.Message_Size = cmd_size
@@ -609,7 +602,6 @@ def pack_import_database_from_xml_file(xml_data, savedatabase):
 	Import_Xml.Command_Header.Time_Stamp1 = int(now)
 	Import_Xml.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Import_Xml.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	if savedatabase:
 		Import_Xml.Command_Header.Flags = BIT_Save_The_Database
 	else:
@@ -629,6 +621,7 @@ def pack_export_database_to_xml_file(xml_data, positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i, p1, p2
 
+	command_header_counter += 1
 	Export_Xml.Command_Header.Command_Id = Export_Database_To_Xml_File_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + sizeof(uint32_t) \
@@ -639,7 +632,6 @@ def pack_export_database_to_xml_file(xml_data, positions):
 	Export_Xml.Command_Header.Time_Stamp1 = int(now)
 	Export_Xml.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Export_Xml.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Export_Xml.Command_Header.Flags = BIT_Degree
 
 	Export_Xml.Msg_Header.Number_Of_Records = npos
@@ -669,6 +661,7 @@ def pack_set_hardstop_orientation(positions):
 	cdef char *cp
 	cdef int cmd_size, npos, i
 
+	command_header_counter += 1
 	Set_HardStop_Ori.Command_Header.Command_Id = Set_HardStop_Orientation_ID
 	npos = len(positions['Module_Id'])
 	cmd_size = sizeof(command_header) + sizeof(number_of_records) + \
@@ -679,7 +672,6 @@ def pack_set_hardstop_orientation(positions):
 	Set_HardStop_Ori.Command_Header.Time_Stamp1 = int(now)
 	Set_HardStop_Ori.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Set_HardStop_Ori.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Set_HardStop_Ori.Command_Header.Flags = 0x0
 
 	Set_HardStop_Ori.Msg_Header.Number_Of_Records = npos
@@ -699,6 +691,7 @@ def pack_set_power_or_reset(cmd, set_motor_freq, sectors):
 	cdef char *cp
 	cdef int cmd_size, i
 
+	command_header_counter += 1
 	Set_Power_or_Reset.Command_Header.Command_Id = Set_Power_or_Reset_ID
 	cmd_size = sizeof(set_sectors_power_or_reset_data_command)
 	Set_Power_or_Reset.Command_Header.Message_Size = cmd_size
@@ -707,7 +700,6 @@ def pack_set_power_or_reset(cmd, set_motor_freq, sectors):
 	Set_Power_or_Reset.Command_Header.Time_Stamp1 = int(now)
 	Set_Power_or_Reset.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Set_Power_or_Reset.Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 	Set_Power_or_Reset.Command_Header.Flags = 0x0
 
 	Set_Power_or_Reset.Msg_Record.Command_Type = cmd
@@ -724,6 +716,7 @@ def pack_run_diagnostic():
 	cdef command_header Command_Header
 	cdef char *cp
 
+	command_header_counter += 1
 	Command_Header.Command_Id = Run_Diagnostic_ID
 	Command_Header.Message_Size = sizeof(command_header)
 
@@ -731,7 +724,6 @@ def pack_run_diagnostic():
 	Command_Header.Time_Stamp1 = int(now)
 	Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Command_Header.Command_Counter = command_header_counter
-	command_header_counter += 1
 
 	Command_Header.Flags = 0
 
