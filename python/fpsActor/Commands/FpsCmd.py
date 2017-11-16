@@ -155,7 +155,7 @@ class FpsCmd(object):
         cmd.finish()
         
     def moveToTarget(self,cmd):   
-        """ Move science fibres to certain place"""
+        """ Move science fiber to certain place"""
 
         mpshost=""
         mpsport=8888
@@ -524,8 +524,8 @@ class FpsCmd(object):
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('EL_INFO',))
         if bool(cur.rowcount) is False:     
-            cur.execute("CREATE TABLE EL_INFO(field_id VARCHAR(20), fid int, ra float8, dec float8,"
-                        "center_f3c float8[2], center_mcs float8[2], target_f3c float8[2], target_mcs float8[2], flag INT)")
+            cur.execute("CREATE TABLE EL_INFO(field_id VARCHAR(20), fid int,"
+                        "config_id INT, motor_map_version VARCHAR(20), el_param INT, home_dir INT)")
             conn.commit()
         
         cur = conn.cursor()
@@ -538,10 +538,10 @@ class FpsCmd(object):
 
         cur.execute("select * from information_schema.tables where table_name=%s", ('FPS_INFO',))
         if bool(cur.rowcount) is False:
-            cur.execute("CREATE TABLE FPS_INFO(runid VARCHAR(20) PRIMARY KEY," 
-                        "odometer INT, hst_time time, ut_time time," 
-                        "ra float8, dec float8, temp float4, fps_version VARCHAR(20),"
-                        "db_version VARCHAR(20))")  
+            cur.execute("CREATE TABLE FPS_INFO(field_id INT," 
+                        "config_id INT, local_time time, home_f3c float8[2],"
+                        "home_mcs float8[2], center_f3c float8[2], center_mcs float8[2],"
+                        "target_f3c float8[2], target_mcs float8[2], flag INT)")  
             conn.commit()
         
         cur.execute("select * from information_schema.tables where table_name=%s", ('ITERATION',))
@@ -554,7 +554,7 @@ class FpsCmd(object):
         
         cur.execute("select * from information_schema.tables where table_name=%s", ('COBRA_INFO',))
         if bool(cur.rowcount) is False:
-            cur.execute("CREATE TABLE COBRA_INFO(module_id int, fid int, config_if INT, position_x float, position_y float, " 
+            cur.execute("CREATE TABLE COBRA_CONFIG(module_id int, fid int, config_id INT, position_x float, position_y float, " 
                         "stage1_r float, stage2_r float, thetaCCW_limit float, thetaCW_limit float, phiCCW_limit float," 
                         "phiCW_limit float, dot_x float, dot_y float)")
             conn.commit()
