@@ -155,7 +155,7 @@ class FpsCmd(object):
         telemetry=m.go_home_all(obstacle_avoidance=True, enable_blind_move=False, j1_use_fast_map=False, j2_use_fast_map=False)
 
         cmd.diag('text="Go_Home_All command finished."')
-        cmd.finish()
+        #cmd.finish()
         
     def moveToTarget(self,cmd):   
         """ Move science fiber to certain place"""
@@ -444,13 +444,15 @@ class FpsCmd(object):
             else 0.0
         
         
+        self.goHomeAll(cmd)
+        
         self.queryMPAtable(cmd)
-        #self._convertF3CtoMCS(cmd)
+        self._convertF3CtoMCS(cmd)
         cmd.inform('text="loop = "%i'%(cnt))
         
-        #for i in range(cnt):
+        for i in range(cnt):
         #    
-        #    cmd.inform('text="loop = "%i'%(i))
+            cmd.inform('text="loop = "%i'%(i))
             
         
         
@@ -522,13 +524,13 @@ class FpsCmd(object):
         cmd.inform('text="odometer = "%i'%(self.odometer))
 
         
-        cmd.finish("text='Conveting F3C to MCS coordinate finished.'")
+        cmd.finish()
     
             
     def _convertF3CtoMCS(self,cmd):
         """Converting target in F3C to MCS."""
         
-        cmd.inform("text='Loaded MPA targets in F3C coordinate.'")
+        cmd.inform("text='Converting target in F3C to MCS finished.'")
     
     def queryMPAtable(self, cmd):
         """Query MPA database and return json string to an attribute."""
