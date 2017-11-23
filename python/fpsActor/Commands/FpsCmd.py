@@ -3,6 +3,7 @@ import base64
 import numpy
 import time
 import psycopg2
+import psycopg2.extras
 import sys
 import xml.etree.ElementTree
 sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
@@ -21,7 +22,9 @@ class FpsCmd(object):
     mpsport=4201
     odometer=0
     fieldid=0
-    f3ctarget=[]
+    f3ctarget=None
+    
+    
     
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -62,7 +65,7 @@ class FpsCmd(object):
             ('getTelemetryData', '', self.getTelemetryData),
             ('setHardstopOrientation', '', self.setHardstopOrientation),
             ('setCurrentPosition', '', self.setCurrentPosition),
-
+            ('queryMPAtable', '', self.queryMPAtable),
         ]
 
         # Define typed command arguments for the above commands.
@@ -434,61 +437,76 @@ class FpsCmd(object):
         
     def testloop(self, cmd):
         """ Run the expose-move loop a few times. For development. """
-
+        
         cnt = cmd.cmd.keywords["cnt"].values[0]
         expTime = cmd.cmd.keywords["expTime"].values[0] \
-          if "expTime" in cmd.cmd.keywords \
-          else 0.0
-
-
-        times = numpy.zeros((cnt, 4), dtype='f8')
+            if "expTime" in cmd.cmd.keywords \
+            else 0.0
         
-        targetPos = self.targetPositions("some field ID")
-        for i in range(cnt):
-            times[i,0] = time.time()
-
-            # Fetch measured centroid from the camera actor
-            cmdString = "centroid expTime=%0.1f" % (expTime)
-            cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
-                                          forUserCmd=cmd, timeLim=expTime+5.0)
-            if cmdVar.didFail:
-                cmd.fail('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
-            #    return
-            # Encoding will be encapsulated.
-            rawCentroids = self.actor.models['mcs'].keyVarDict['centroidsChunk'][0]
-            centroids = numpy.fromstring(base64.b64decode(rawCentroids), dtype='f4').reshape(2400,2)
-            times[i,1] = time.time()
-
-            # Command the actuators to move.
-            cmdString = 'moveTo chunk=%s' % (base64.b64encode(targetPos.tostring()))
-            cmdVar = self.actor.cmdr.call(actor='mps', cmdStr=cmdString,
-                                          forUserCmd=cmd, timeLim=5.0)
-            if cmdVar.didFail:
-                cmd.fail('text=%s' % (qstr('Failed to move with %s' % (cmdString))))
-                return
-            times[i,2] = time.time()
-
-            cmdVar = self.actor.cmdr.call(actor='mps', cmdStr="ping",
-                                          forUserCmd=cmd, timeLim=5.0)
-            if cmdVar.didFail:
-                cmd.fail('text=%s' % (qstr('Failed to ping')))
-                return
-            times[i,3] = time.time()
-
-        for i, itimes in enumerate(times):
-            cmd.inform('text="dt[%d]=%0.4f, %0.4f, %0.4f"' % (i+1, 
-                                                              itimes[1]-itimes[0],
-                                                              itimes[2]-itimes[1],
-                                                              itimes[3]-itimes[2],
-                                                              ))
-        cmd.inform('text="dt[mean]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).sum()/cnt,
-                                                            (times[:,2]-times[:,1]).sum()/cnt,
-                                                            (times[:,3]-times[:,2]).sum()/cnt))
-        cmd.inform('text="dt[max]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).max(),
-                                                           (times[:,2]-times[:,1]).max(),
-                                                           (times[:,3]-times[:,2]).max()))
+        
+        self.queryMPAtable(cmd)
+        #self._convertF3CtoMCS(cmd)
+        cmd.inform('text="loop = "%i'%(cnt))
+        
+        #for i in range(cnt):
+        #    
+        #    cmd.inform('text="loop = "%i'%(i))
+            
+        
+        
+#         expTime = cmd.cmd.keywords["expTime"].values[0] \
+#           if "expTime" in cmd.cmd.keywords \
+#           else 0.0
+# 
+# 
+#         times = numpy.zeros((cnt, 4), dtype='f8')
+#         
+#         targetPos = self.targetPositions("some field ID")
+#         for i in range(cnt):
+#             times[i,0] = time.time()
+# 
+#             # Fetch measured centroid from the camera actor
+#             cmdString = "centroid expTime=%0.1f" % (expTime)
+#             cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
+#                                           forUserCmd=cmd, timeLim=expTime+5.0)
+#             if cmdVar.didFail:
+#                 cmd.fail('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
+#             #    return
+#             # Encoding will be encapsulated.
+#             rawCentroids = self.actor.models['mcs'].keyVarDict['centroidsChunk'][0]
+#             centroids = numpy.fromstring(base64.b64decode(rawCentroids), dtype='f4').reshape(2400,2)
+#             times[i,1] = time.time()
+# 
+#             # Command the actuators to move.
+#             cmdString = 'moveTo chunk=%s' % (base64.b64encode(targetPos.tostring()))
+#             cmdVar = self.actor.cmdr.call(actor='mps', cmdStr=cmdString,
+#                                           forUserCmd=cmd, timeLim=5.0)
+#             if cmdVar.didFail:
+#                 cmd.fail('text=%s' % (qstr('Failed to move with %s' % (cmdString))))
+#                 return
+#             times[i,2] = time.time()
+# 
+#             cmdVar = self.actor.cmdr.call(actor='mps', cmdStr="ping",
+#                                           forUserCmd=cmd, timeLim=5.0)
+#             if cmdVar.didFail:
+#                 cmd.fail('text=%s' % (qstr('Failed to ping')))
+#                 return
+#             times[i,3] = time.time()
+# 
+#         for i, itimes in enumerate(times):
+#             cmd.inform('text="dt[%d]=%0.4f, %0.4f, %0.4f"' % (i+1, 
+#                                                               itimes[1]-itimes[0],
+#                                                               itimes[2]-itimes[1],
+#                                                               itimes[3]-itimes[2],
+#                                                               ))
+#         cmd.inform('text="dt[mean]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).sum()/cnt,
+#                                                             (times[:,2]-times[:,1]).sum()/cnt,
+#                                                             (times[:,3]-times[:,2]).sum()/cnt))
+#         cmd.inform('text="dt[max]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).max(),
+#                                                            (times[:,2]-times[:,1]).max(),
+#                                                            (times[:,3]-times[:,2]).max()))
                                                             
-        cmd.finish()
+        cmd.finish("text='Testing loop finished.'")
         
     def setOdometer(self, cmd):
         """Setting the odometer number and start a data base table."""
@@ -504,7 +522,35 @@ class FpsCmd(object):
         cmd.inform('text="odometer = "%i'%(self.odometer))
 
         
-        cmd.finish()    
+        cmd.finish("text='Conveting F3C to MCS coordinate finished.'")
+    
+            
+    def _convertF3CtoMCS(self,cmd):
+        """Converting target in F3C to MCS."""
+        
+        cmd.inform("text='Loaded MPA targets in F3C coordinate.'")
+    
+    def queryMPAtable(self, cmd):
+        """Query MPA database and return json string to an attribute."""
+        try:
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+        except:
+            print "I am unable to connect to the database."
+        
+        cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)  
+        cur.execute("""SELECT * from MPA""")
+        results = []
+        column = ('f3c_x','f3c_y')
+        rows = cur.fetchall()
+        
+        for row in rows:
+            results.append(dict(zip(column, row['target_f3c'])))
+        
+        f3c_json = json.dumps(results, indent=1)
+        self.f3ctarget=f3c_json
+        
+        
+        cmd.inform("text='Loaded MPA targets in F3C coordinate.'")  
         
     def dbinit(self, cmd):
         """ Initializing the database tables.  """
