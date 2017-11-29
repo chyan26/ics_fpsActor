@@ -17,7 +17,7 @@ class MPSClient:
 		self.sock.connect((host, port))
 
 	def _send_command(self, data):
-		self.sock.send(data)
+		self.sock.sendall(data)
 
 	def _get_response(self, size):
 		data = bytearray(size)
@@ -185,7 +185,7 @@ class MPSClient:
 		"""Set Database Data command"""
 		# send command
 		cmd_buffer = pfi.pack_set_database_data(xml_data, save_database)
-		return self._get_command_response(cmd_buffer)
+		self._get_command_response(cmd_buffer)
 
 	def import_database_from_xml_file(self, xml_data, save_database=False):
 		"""Import Database from XML File command"""
