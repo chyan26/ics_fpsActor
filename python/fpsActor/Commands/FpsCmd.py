@@ -85,12 +85,12 @@ class FpsCmd(object):
 
         self.actor.sendVersionKey(cmd)
 
-        keyStrings = ['text="nothing to say, really"']
+        keyStrings = ['text="FPS Actor status report"']
         keyMsg = '; '.join(keyStrings)
 
         cmd.inform(keyMsg)
         cmd.diag(sys.path)
-        cmd.diag('text="still nothing to say"')
+        cmd.diag('text="FPS ready to go."')
         cmd.finish()
         
     def sendCommand(self,cmd):
@@ -155,7 +155,7 @@ class FpsCmd(object):
         cmd.finish()
         
     def moveToTarget(self,cmd):   
-        """ Move science fibres to certain place"""
+        """ Move science fiber to certain place"""
 
         mpshost=""
         mpsport=8888
@@ -517,45 +517,46 @@ class FpsCmd(object):
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('MPA',))
         if bool(cur.rowcount) is False:     
-            cur.execute("CREATE TABLE TARGET(field_id VARCHAR(20), fid int, ra float8, dec float8,"
+            cur.execute("CREATE TABLE MPA(field_id VARCHAR(20), fid int, ra float8, dec float8,"
                         "target_f3c float8[2], target_flag int)")
             conn.commit()
             
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('EL_INFO',))
         if bool(cur.rowcount) is False:     
-            cur.execute("CREATE TABLE TARGET(field_id VARCHAR(20), fid int, ra float8, dec float8,"
-                        "center_f3c float8[2], center_mcs float8[2], target_f3c float8[2], target_mcs float8[2], flag INT)")
+            cur.execute("CREATE TABLE EL_INFO(field_id VARCHAR(20), fid int,"
+                        "config_id INT, motor_map_version VARCHAR(20), el_param INT, home_dir INT)")
             conn.commit()
         
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('TARGET',))
         if bool(cur.rowcount) is False:     
             cur.execute("CREATE TABLE TARGET(odometer INT, runid VARCHAR(20), fid int, cid int, local_time time, "
-                        "rotate_angle float, telescope_el float, system_temperture float, software_version string, db_version string)")
+                        "rotate_angle float, telescope_el float, system_temperture float, "
+                        "software_version VARCHAR(20), db_version  VARCHAR(20))")
             conn.commit()
 
         cur.execute("select * from information_schema.tables where table_name=%s", ('FPS_INFO',))
         if bool(cur.rowcount) is False:
-            cur.execute("CREATE TABLE FPS_INFO(runid VARCHAR(20) PRIMARY KEY," 
-                        "odometer INT, hst_time time, ut_time time," 
-                        "ra float8, dec float8, temp float4, fps_version VARCHAR(20),"
-                        "db_version VARCHAR(20))")  
+            cur.execute("CREATE TABLE FPS_INFO(field_id INT," 
+                        "config_id INT, local_time time, home_f3c float8[2],"
+                        "home_mcs float8[2], center_f3c float8[2], center_mcs float8[2],"
+                        "target_f3c float8[2], target_mcs float8[2], flag INT)")  
             conn.commit()
         
         cur.execute("select * from information_schema.tables where table_name=%s", ('ITERATION',))
         if bool(cur.rowcount) is False:
-            cur.execute("CREATE TABLE ITERATION(iid int, fid int, odometer INT, local_time time, " 
-                        "target_f3c float8[2], target_mcs float8[2], current_f3c float8[2], current_mcs float8[2]," 
-                        "cobra_phi float, cobra_theta float, fwhm_x float, fwhm_y float, angle float, flux float,"
-                        "on-source int, sn_quality float, collision_flag int)")  
+            cur.execute("CREATE TABLE ITERATION(iid INT, fid INT, odometer INT, local_time time, " 
+                        "target_f3c float8[2], target_mcs float8[2], current_f3c float8[2], current_mcs float8[2], " 
+                        "cobra_phi float, cobra_theta float, fwhm_x float, fwhm_y float, angle float, flux float, "
+                        "on_source INT, sn_quality float, collision_flag int)")  
             conn.commit()
         
         cur.execute("select * from information_schema.tables where table_name=%s", ('COBRA_INFO',))
         if bool(cur.rowcount) is False:
-            cur.execute("CREATE TABLE COBRA_INFO(module_id int, fid int, config_if INT, position_x float, position_y float, " 
+            cur.execute("CREATE TABLE COBRA_CONFIG(module_id int, fid int, config_id INT, position_x float, position_y float, " 
                         "stage1_r float, stage2_r float, thetaCCW_limit float, thetaCW_limit float, phiCCW_limit float," 
-                        "phiCW_limit float, dot_x float, dot_y flaot)")
+                        "phiCW_limit float, dot_x float, dot_y float)")
             conn.commit()
 
         cur.execute("select * from information_schema.tables where table_name=%s", ('MORTORMAP_INFO',))
@@ -564,6 +565,15 @@ class FpsCmd(object):
                         "mortormap_path VARCHAR(256), mortormap_date VARCHAR(20))") 
         
             conn.commit()
+        
+        cur.execute("select * from information_schema.tables where table_name=%s", ('DISTOR_INFO',))
+        if bool(cur.rowcount) is False:
+            cur.execute("CREATE TABLE DISTOR_INFO(config_id INT PRIMARY KEY, telescope_el float8, distor_coeff float8[8][8])") 
+        
+            conn.commit()
+            
+        
+            
         conn.close()
             
         cmd.finish("text='FPS database initializing finished.'")
