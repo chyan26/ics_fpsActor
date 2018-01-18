@@ -4,7 +4,6 @@ from __future__ import print_function
 from __future__ import division
 from builtins import map
 from builtins import zip
-from past.utils import old_div
 import os,sys,re
 import math as mt
 import numpy as np
@@ -50,7 +49,7 @@ def MCStoPFI(xysky, za):
 # differential : z
 def DeviationZenithAngle(xysky,za):
 
-    coeffz=old_div(DiffCoeff(za),DiffCoeff(30.))
+    coeffz=DiffCoeff(za)/DiffCoeff(30.)
 
     # x : dx = c0*x*y
     cx0=0.000503107811479
@@ -82,7 +81,7 @@ def DeviationZenithAngle(xysky,za):
 
 def DiffCoeff(za):
 
-    za*=old_div(np.pi,180.)
+    za*=np.pi/180.
     return 0.995339*(1.741417*np.sin(za)+(1.-np.cos(za)))
 
 
