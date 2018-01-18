@@ -1,3 +1,4 @@
+from __future__ import print_function
 import json
 import base64
 import numpy
@@ -544,7 +545,7 @@ class FpsCmd(object):
         try:
             conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
         except:
-            print "I am unable to connect to the database."
+            print("I am unable to connect to the database.")
         
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)  
         cur.execute("""SELECT * from MPA""")
@@ -567,7 +568,7 @@ class FpsCmd(object):
         try:
             conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
         except:
-            print "I am unable to connect to the database"
+            print("I am unable to connect to the database")
         
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('MPA',))
