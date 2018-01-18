@@ -1,4 +1,7 @@
 from __future__ import print_function
+from builtins import zip
+from builtins import range
+from builtins import object
 import json
 import base64
 import numpy
@@ -554,7 +557,7 @@ class FpsCmd(object):
         rows = cur.fetchall()
         
         for row in rows:
-            results.append(dict(zip(column, row['target_f3c'])))
+            results.append(dict(list(zip(column, row['target_f3c']))))
         
         f3c_json = json.dumps(results, indent=1)
         self.f3ctarget=f3c_json

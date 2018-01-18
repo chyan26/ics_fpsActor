@@ -1,3 +1,4 @@
+from builtins import object
 import socket
 import pfi_interface as pfi
 
@@ -7,7 +8,7 @@ class MPSError(Exception):
 	pass
 
 
-class MPSClient:
+class MPSClient(object):
 
 	def __init__(self, host, port, command_header_counter=0):
 		self.host = host
