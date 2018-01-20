@@ -453,9 +453,16 @@ class FpsCmd(object):
         for i in range(cnt):
         #    
             cmd.inform('text="loop = "%i'%(i))
+            cmdString = "centroidOnDummy expTime=%0.1f" % (expTime)
+            cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
+                                          forUserCmd=cmd, timeLim=expTime)
+        
+            if cmdVar.didFail:
+                 cmd.fail('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
+                 
+            rawCentroids = self.actor.models['mcs'].keyVarDict['centroidsChunk'][0]
             
-        
-        
+                 
 #         expTime = cmd.cmd.keywords["expTime"].values[0] \
 #           if "expTime" in cmd.cmd.keywords \
 #           else 0.0
