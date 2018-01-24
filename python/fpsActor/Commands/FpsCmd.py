@@ -15,8 +15,8 @@ sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
                 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
-import pfi_interface as pfi
-import mpsClient as mps
+from fpsActor.mpsClient import mpsClient as mps
+from fpsActor.mpsClient import pfi_interface as pfi
 
 from opscore.utility.qstr import qstr
 

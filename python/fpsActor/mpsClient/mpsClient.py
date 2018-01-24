@@ -1,7 +1,8 @@
 from builtins import object
 import socket
-import pfi_interface as pfi
+from . import pfi_interface as pfi
 
+import logging
 
 class MPSError(Exception):
 	"""Exception for MPSClient"""
