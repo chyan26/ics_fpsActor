@@ -1,3 +1,7 @@
+from __future__ import print_function
+from builtins import zip
+from builtins import range
+from builtins import object
 import json
 import base64
 import numpy
@@ -11,8 +15,8 @@ sys.path.append("/home/chyan/mhs/devel/ics_fpsActor/python/fpsActor/mpsClient")
                 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
-import pfi_interface as pfi
-import mpsClient as mps
+from fpsActor.mpsClient import mpsClient as mps
+from fpsActor.mpsClient import pfi_interface as pfi
 
 from opscore.utility.qstr import qstr
 
@@ -544,7 +548,7 @@ class FpsCmd(object):
         try:
             conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
         except:
-            print "I am unable to connect to the database."
+            print("I am unable to connect to the database.")
         
         cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)  
         cur.execute("""SELECT * from MPA""")
@@ -553,7 +557,7 @@ class FpsCmd(object):
         rows = cur.fetchall()
         
         for row in rows:
-            results.append(dict(zip(column, row['target_f3c'])))
+            results.append(dict(list(zip(column, row['target_f3c']))))
         
         f3c_json = json.dumps(results, indent=1)
         self.f3ctarget=f3c_json
@@ -567,7 +571,7 @@ class FpsCmd(object):
         try:
             conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
         except:
-            print "I am unable to connect to the database"
+            print("I am unable to connect to the database")
         
         cur = conn.cursor()
         cur.execute("select * from information_schema.tables where table_name=%s", ('MPA',))

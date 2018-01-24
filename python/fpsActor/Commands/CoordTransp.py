@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+from __future__ import print_function
+from __future__ import division
+from builtins import map
+from builtins import zip
 import os,sys,re
 import math as mt
 import numpy as np
@@ -13,7 +17,7 @@ def MCStoPFI(xysky, za):
    arg=[mt.atan2(j,i)+mt.pi for i,j in zip(*xysky)]
 
 
-   print >> sys.stderr , "Scaling"
+   print("Scaling", file=sys.stderr)
 
    scale=ScalingFactor(xysky)
 
@@ -23,7 +27,7 @@ def MCStoPFI(xysky, za):
    #offx1,offy1=OffsetBase(xysky)
 
    # z-dependent
-   print >> sys.stderr , "Offset 2"
+   print("Offset 2", file=sys.stderr)
    offx2,offy2=DeviationZenithAngle(xysky,za)
 
    xyf3c=[]
@@ -105,7 +109,7 @@ def OffsetBase(xysky):
     x_itrp=ipol.SmoothBivariateSpline(IpolD[0,:],IpolD[1,:],IpolD[2,:],kx=5,ky=5,s=1)
     y_itrp=ipol.SmoothBivariateSpline(IpolD[0,:],IpolD[1,:],IpolD[3,:],kx=5,ky=5,s=1)
 
-    print >> sys.stderr , "Interpol Done."
+    print("Interpol Done.", file=sys.stderr)
 
     offsetx=[]
     offsety=[]
@@ -160,7 +164,7 @@ def ScalingFactor_Inter():
     fi.close
 
     lines=[i.split() for i in line]
-    IpolD=map(list, zip(*lines))
+    IpolD=list(map(list, list(zip(*lines))))
 
     r_itrp=ipol.splrep(IpolD[0],IpolD[1],s=0)
 

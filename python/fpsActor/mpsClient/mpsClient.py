@@ -1,13 +1,15 @@
+from builtins import object
 import socket
-import pfi_interface as pfi
+from . import pfi_interface as pfi
 
+import logging
 
 class MPSError(Exception):
 	"""Exception for MPSClient"""
 	pass
 
 
-class MPSClient:
+class MPSClient(object):
 
 	def __init__(self, host, port, command_header_counter=0):
 		self.host = host
