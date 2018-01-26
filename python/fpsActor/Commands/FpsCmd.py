@@ -546,7 +546,7 @@ class FpsCmd(object):
     def queryMPAtable(self, cmd):
         """Query MPA database and return json string to an attribute."""
         try:
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfspass'")
         except:
             print("I am unable to connect to the database.")
         
@@ -569,7 +569,7 @@ class FpsCmd(object):
         """ Initializing the database tables.  """
   
         try:
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfs@hydra'")
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfspass'")
         except:
             print("I am unable to connect to the database")
         
