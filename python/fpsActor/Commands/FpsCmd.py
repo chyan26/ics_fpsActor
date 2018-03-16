@@ -545,8 +545,10 @@ class FpsCmd(object):
     
     def queryMPAtable(self, cmd):
         """Query MPA database and return json string to an attribute."""
+        file = open("/home/pfs/mhs/devel/ics_fpsActor/etc/dbpasswd.cfg", "r")
+        passstring = file.read()
         try:
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfspass'")
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password="+passstring)
         except:
             print("I am unable to connect to the database.")
         
@@ -567,9 +569,10 @@ class FpsCmd(object):
         
     def dbinit(self, cmd):
         """ Initializing the database tables.  """
-  
+        file = open("/home/pfs/mhs/devel/ics_fpsActor/etc/dbpasswd.cfg", "r")
+        passstring = file.read()
         try:
-            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password='pfspass'")
+            conn = psycopg2.connect("dbname='fps' user='pfs' host='localhost' password="+passstring)
         except:
             print("I am unable to connect to the database")
         
@@ -605,7 +608,7 @@ class FpsCmd(object):
         
         cur.execute("select * from information_schema.tables where table_name=%s", ('ITERATION',))
         if bool(cur.rowcount) is False:
-            cur.execute("CREATE TABLE ITERATION(iid INT, fid INT, odometer INT, local_time time, " 
+            cur.execute("CREATE TABLE MCS(iid INT, fid INT, odometer INT, local_time time, " 
                         "target_f3c float8[2], target_mcs float8[2], current_f3c float8[2], current_mcs float8[2], " 
                         "cobra_phi float, cobra_theta float, fwhm_x float, fwhm_y float, angle float, flux float, "
                         "on_source INT, sn_quality float, collision_flag int)")  
