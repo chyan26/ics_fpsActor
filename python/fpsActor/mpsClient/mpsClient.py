@@ -1,6 +1,6 @@
 from builtins import object
 import socket
-from . import pfi_interface as pfi
+import pfi_interface as pfi
 
 import logging
 
@@ -72,7 +72,7 @@ class MPSClient(object):
 		status, errStr = pfi.parse_command_response(response_message)
 		if status != 0:
 			raise MPSError(errStr)
-		# get command response (Command is done)
+		# get database data
 		response_header = self._get_response(pfi.header_size)
 		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
 		if cmd_id < 0:
@@ -80,7 +80,6 @@ class MPSClient(object):
 		elif pfi.isSend_Database_Data(cmd_id):
 			response_message = self._get_response(body_size)
 			data = pfi.parse_send_database_data(response_message)
-			return data
 		elif pfi.isCommand_Response(cmd_id):
 			response_message = self._get_response(body_size)
 			status, errStr = pfi.parse_command_response(response_message)
@@ -90,6 +89,19 @@ class MPSClient(object):
 				raise MPSError("Empty database data???")
 		else:
 			raise MPSError("Message header ID error: %d" % cmd_id)
+		# get command response (Command is done)
+		response_header = self._get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id < 0:
+			raise MPSError("Command counter mismatched")
+		elif not pfi.isCommand_Response(cmd_id):
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = self._get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 1:
+			raise MPSError(errStr)
+		else:
+			return data
 
 	def _get_telemetry_data(self, cmd):
 		self._send_command(cmd)
@@ -104,7 +116,7 @@ class MPSClient(object):
 		status, errStr = pfi.parse_command_response(response_message)
 		if status != 0:
 			raise MPSError(errStr)
-		# get command response (Command is done)
+		# get telemetry response
 		response_header = self._get_response(pfi.header_size)
 		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
 		if cmd_id < 0:
@@ -112,7 +124,6 @@ class MPSClient(object):
 		elif pfi.isSend_Telemetry_Data(cmd_id):
 			response_message = self._get_response(body_size)
 			telemetry = pfi.parse_send_telemetry_data(response_message)
-			return telemetry
 		elif pfi.isCommand_Response(cmd_id):
 			response_message = self._get_response(body_size)
 			status, errStr = pfi.parse_command_response(response_message)
@@ -122,6 +133,19 @@ class MPSClient(object):
 				raise MPSError("Empty telemetry data???")
 		else:
 			raise MPSError("Message header ID error: %d" % cmd_id)
+		# get command response (Command is done)
+		response_header = self._get_response(pfi.header_size)
+		cmd_id, cmd_counter, body_size = pfi.parse_msg_header_response(response_header)
+		if cmd_id < 0:
+			raise MPSError("Command counter mismatched")
+		elif not pfi.isCommand_Response(cmd_id):
+			raise MPSError("Message header ID error: %d" % cmd_id)
+		response_message = self._get_response(body_size)
+		status, errStr = pfi.parse_command_response(response_message)
+		if status != 1:
+			raise MPSError(errStr)
+		else:
+			return telemetry
 
 	def go_home_all(self, obstacle_avoidance=True, enable_blind_move=False, j1_use_fast_map=False, j2_use_fast_map=False):
 		"""GO HOME ALL command"""

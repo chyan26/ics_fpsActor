@@ -581,7 +581,7 @@ def pack_set_database_data(xml_data, savedatabase):
 
 	Set_Database_Data.Msg_Record.Xml_File_Size = len(xml_data)
 	for i in range(len(xml_data)):
-		Set_Database_Data.Msg_Record.Xml_File_Data[i] = ord(xml_data[i])
+		Set_Database_Data.Msg_Record.Xml_File_Data[i] = xml_data[i]
 
 	cp = <char *> &Set_Database_Data
 	return cp[:cmd_size]
