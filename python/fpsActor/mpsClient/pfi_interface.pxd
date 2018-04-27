@@ -60,6 +60,8 @@ cdef extern from "pfi_interface_defs.h" nogil:
 		BIT_Kinematics_Failed
 		BIT_DB_Invalid
 		BIT_Get_Fresh_HK_Data
+		Get_Binary_Database
+		BIT_Update_Database_From_HK
 
 		#Pfi command to MPS IDS
 		Move_To_Target_ID

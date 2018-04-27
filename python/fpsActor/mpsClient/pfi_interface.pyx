@@ -6,16 +6,26 @@
 #
 
 import time
+import numpy as np
+
 
 cdef:
 	unsigned long command_header_counter
 
 command_header_counter = 0
 header_size = sizeof(command_header)
+unit_radians = BIT_Radians
+unit_degree = BIT_Degree
+unit_step = BIT_Step_Count
+status_ok = STATUS_OK
+cmd_ok = CMD_EXEC_OK
+cmd_failed = CMD_EXEC_FAILED
+
 
 def set_command_header_counter(counter):
 	global command_header_counter
 	command_header_counter = counter
+
 
 def get_command_header_counter():
 	global command_header_counter
@@ -159,44 +169,45 @@ def parse_send_telemetry_data(resp):
 	print "Parse_Send_Telemetry_Data() ==>> Number_Of_Records=%d" % sz
 	index += sizeof(number_of_records)
 
-	data = {
-		'Module_Id': [],
-		'Positioner_Id': [],
-		'Flags': [],
-		'Target_Number': [],
-		'Iteration_number': [],
-		'Target_X': [],
-		'Target_Y': [],
-		'Target_Joint1_Angle': [],
-		'Target_Joint2_Angle': [],
-		'Target_Joint1_Quadrant': [],
-		'Target_Joint2_Quadrant': [],
-		'Current_X': [],
-		'Current_Y': [],
-		'Current_Join1_Angle': [],
-		'Current_Join2_Angle': [],
-		'Current_Joint1_Quadrant': [],
-		'Current_Joint2_Quadrant': [],
-		'Joint1_Step': [],
-		'Joint2_Step': [],
-		'Join1_Step_Delay': [],
-		'Join2_Step_Delay': [],
-		'Target_Changed': [],
-		'Target_Changed_X': [],
-		'Target_Changed_Y': [],
-		'HardStop_Ori': [],
-		'Joint1_from_Angle': [],
-		'Joint1_to_Angle': [],
-		'FPGA_Board_Number': [],
-		'FPGA_Temp1': [],
-		'FPGA_Temp2': [],
-		'FPGA_Voltage': [],
-		'FPGA_Join1_Frequency': [],
-		'FPGA_Join1_Current': [],
-		'FPGA_Join2_Frequency': [],
-		'FPGA_Join2_Current': []
-	}
+	dtype_telemetry_data = [
+		('Module_Id', 'i2'),
+		('Positioner_Id', 'i2'),
+		('Flags', 'i4'),
+		('Target_Number', 'i4'),
+		('Iteration_number', 'i4'),
+		('Target_X', 'f4'),
+		('Target_Y', 'f4'),
+		('Target_Joint1_Angle', 'f4'),
+		('Target_Joint2_Angle', 'f4'),
+		('Target_Joint1_Quadrant', 'i4'),
+		('Target_Joint2_Quadrant', 'i4'),
+		('Current_X', 'f4'),
+		('Current_Y', 'f4'),
+		('Current_Join1_Angle', 'f4'),
+		('Current_Join2_Angle', 'f4'),
+		('Current_Joint1_Quadrant', 'i4'),
+		('Current_Joint2_Quadrant', 'i4'),
+		('Joint1_Step', 'i4'),
+		('Joint2_Step', 'i4'),
+		('Join1_Step_Delay', 'f4'),
+		('Join2_Step_Delay', 'f4'),
+		('Target_Changed', 'i4'),
+		('Target_Changed_X', 'f4'),
+		('Target_Changed_Y', 'f4'),
+		('HardStop_Ori', 'i4'),
+		('Joint1_from_Angle', 'f4'),
+		('Joint1_to_Angle', 'f4'),
+		('FPGA_Board_Number', 'i4'),
+		('FPGA_Temp1', 'f4'),
+		('FPGA_Temp2', 'f4'),
+		('FPGA_Voltage', 'f4'),
+		('FPGA_Join1_Frequency', 'f4'),
+		('FPGA_Join1_Current', 'f4'),
+		('FPGA_Join2_Frequency', 'f4'),
+		('FPGA_Join2_Current', 'f4'),
+	]
 
+	data = np.empty([sz], dtype=dtype_telemetry_data)
 	print "Parse_Send_Telemetry_Data() ==>> : \n"
 	for i in range(sz):
 		p_telemetry_data_record = <send_telemetry_data_record *> &buf[index];
@@ -206,46 +217,46 @@ def parse_send_telemetry_data(resp):
 				p_telemetry_data_record.Module_Id, \
 				p_telemetry_data_record.Positioner_Id, \
 				p_telemetry_data_record.Iteration_number)
-		data['Module_Id'].append(p_telemetry_data_record.Module_Id)
-		data['Positioner_Id'].append(p_telemetry_data_record.Positioner_Id)
-		data['Flags'].append(p_telemetry_data_record.Flags)
-		data['Target_Number'].append(p_telemetry_data_record.Target_Number)
-		data['Iteration_number'].append(p_telemetry_data_record.Iteration_number)
-		data['Target_X'].append(p_telemetry_data_record.Target_X)
-		data['Target_Y'].append(p_telemetry_data_record.Target_Y)
-		data['Target_Joint1_Angle'].append(p_telemetry_data_record.Target_Joint1_Angle)
-		data['Target_Joint2_Angle'].append(p_telemetry_data_record.Target_Joint2_Angle)
-		data['Target_Joint1_Quadrant'].append(p_telemetry_data_record.Target_Joint1_Quadrant)
-		data['Target_Joint2_Quadrant'].append(p_telemetry_data_record.Target_Joint2_Quadrant)
-		data['Current_X'].append(p_telemetry_data_record.Current_X)
-		data['Current_Y'].append(p_telemetry_data_record.Current_Y)
-		data['Current_Join1_Angle'].append(p_telemetry_data_record.Current_Join1_Angle)
-		data['Current_Join2_Angle'].append(p_telemetry_data_record.Current_Join2_Angle)
-		data['Current_Joint1_Quadrant'].append(p_telemetry_data_record.Current_Joint1_Quadrant)
-		data['Current_Joint2_Quadrant'].append(p_telemetry_data_record.Current_Joint2_Quadrant)
-		data['Joint1_Step'].append(p_telemetry_data_record.Joint1_Step)
-		data['Joint2_Step'].append(p_telemetry_data_record.Joint2_Step)
-		data['Join1_Step_Delay'].append(p_telemetry_data_record.Join1_Step_Delay)
-		data['Join2_Step_Delay'].append(p_telemetry_data_record.Join2_Step_Delay)
-		data['Target_Changed'].append(p_telemetry_data_record.Target_Changed)
-		data['Target_Changed_X'].append(p_telemetry_data_record.Target_Changed_X)
-		data['Target_Changed_Y'].append(p_telemetry_data_record.Target_Changed_Y)
-		data['HardStop_Ori'].append(p_telemetry_data_record.HardStop_Ori)
-		data['Joint1_from_Angle'].append(p_telemetry_data_record.Joint1_from_Angle)
-		data['Joint1_to_Angle'].append(p_telemetry_data_record.Joint1_to_Angle)
-		data['FPGA_Board_Number'].append(p_telemetry_data_record.FPGA_Board_Number)
-		data['FPGA_Temp1'].append(p_telemetry_data_record.FPGA_Temp1)
-		data['FPGA_Temp2'].append(p_telemetry_data_record.FPGA_Temp2)
-		data['FPGA_Voltage'].append(p_telemetry_data_record.FPGA_Voltage)
-		data['FPGA_Join1_Frequency'].append(p_telemetry_data_record.FPGA_Join1_Frequency)
-		data['FPGA_Join1_Current'].append(p_telemetry_data_record.FPGA_Join1_Current)
-		data['FPGA_Join2_Frequency'].append(p_telemetry_data_record.FPGA_Join2_Frequency)
-		data['FPGA_Join2_Current'].append(p_telemetry_data_record.FPGA_Join2_Current)
+		data[i]['Module_Id'] = p_telemetry_data_record.Module_Id
+		data[i]['Positioner_Id'] = p_telemetry_data_record.Positioner_Id
+		data[i]['Flags'] = p_telemetry_data_record.Flags
+		data[i]['Target_Number'] = p_telemetry_data_record.Target_Number
+		data[i]['Iteration_number'] = p_telemetry_data_record.Iteration_number
+		data[i]['Target_X'] = p_telemetry_data_record.Target_X
+		data[i]['Target_Y'] = p_telemetry_data_record.Target_Y
+		data[i]['Target_Joint1_Angle'] = p_telemetry_data_record.Target_Joint1_Angle
+		data[i]['Target_Joint2_Angle'] = p_telemetry_data_record.Target_Joint2_Angle
+		data[i]['Target_Joint1_Quadrant'] = p_telemetry_data_record.Target_Joint1_Quadrant
+		data[i]['Target_Joint2_Quadrant'] = p_telemetry_data_record.Target_Joint2_Quadrant
+		data[i]['Current_X'] = p_telemetry_data_record.Current_X
+		data[i]['Current_Y'] = p_telemetry_data_record.Current_Y
+		data[i]['Current_Join1_Angle'] = p_telemetry_data_record.Current_Join1_Angle
+		data[i]['Current_Join2_Angle'] = p_telemetry_data_record.Current_Join2_Angle
+		data[i]['Current_Joint1_Quadrant'] = p_telemetry_data_record.Current_Joint1_Quadrant
+		data[i]['Current_Joint2_Quadrant'] = p_telemetry_data_record.Current_Joint2_Quadrant
+		data[i]['Joint1_Step'] = p_telemetry_data_record.Joint1_Step
+		data[i]['Joint2_Step'] = p_telemetry_data_record.Joint2_Step
+		data[i]['Join1_Step_Delay'] = p_telemetry_data_record.Join1_Step_Delay
+		data[i]['Join2_Step_Delay'] = p_telemetry_data_record.Join2_Step_Delay
+		data[i]['Target_Changed'] = p_telemetry_data_record.Target_Changed
+		data[i]['Target_Changed_X'] = p_telemetry_data_record.Target_Changed_X
+		data[i]['Target_Changed_Y'] = p_telemetry_data_record.Target_Changed_Y
+		data[i]['HardStop_Ori'] = p_telemetry_data_record.HardStop_Ori
+		data[i]['Joint1_from_Angle'] = p_telemetry_data_record.Joint1_from_Angle
+		data[i]['Joint1_to_Angle'] = p_telemetry_data_record.Joint1_to_Angle
+		data[i]['FPGA_Board_Number'] = p_telemetry_data_record.FPGA_Board_Number
+		data[i]['FPGA_Temp1'] = p_telemetry_data_record.FPGA_Temp1
+		data[i]['FPGA_Temp2'] = p_telemetry_data_record.FPGA_Temp2
+		data[i]['FPGA_Voltage'] = p_telemetry_data_record.FPGA_Voltage
+		data[i]['FPGA_Join1_Frequency'] = p_telemetry_data_record.FPGA_Join1_Frequency
+		data[i]['FPGA_Join1_Current'] = p_telemetry_data_record.FPGA_Join1_Current
+		data[i]['FPGA_Join2_Frequency'] = p_telemetry_data_record.FPGA_Join2_Frequency
+		data[i]['FPGA_Join2_Current'] = p_telemetry_data_record.FPGA_Join2_Current
 
 	return (exec_time, data)
 
 
-def pack_move_to_target(sequence_number, iteration_number, positions, obstacle_avoidance, enable_blind_move):
+def pack_move_to_target(sequence_number, iteration_number, target_number, positions):
 	global command_header_counter
 	cdef move_to_target_command Move_To_Target
 	cdef char *cp
@@ -266,14 +277,10 @@ def pack_move_to_target(sequence_number, iteration_number, positions, obstacle_a
 
 	Move_To_Target.Msg_Header.Sequnce_Number = sequence_number
 	Move_To_Target.Msg_Header.Iteration_Number = iteration_number
-	Move_To_Target.Msg_Header.Target_Number = npos
+	Move_To_Target.Msg_Header.Target_Number = target_number
 	Move_To_Target.Msg_Header.Number_Of_Records = npos
 
 	Move_To_Target.Msg_Header.Flags = 0x0
-	if obstacle_avoidance:
-		Move_To_Target.Msg_Header.Flags |= BIT_Obstacle_Avoidance
-		if enable_blind_move:
-			Move_To_Target.Msg_Header.Flags |= BIT_Enable_Blind_Move
 
 	for i in range(npos):
 		Move_To_Target.Msg_Record[i].Module_Id = positions['Module_Id'][i]
@@ -298,7 +305,7 @@ def pack_move_to_target(sequence_number, iteration_number, positions, obstacle_a
 	return cp[:cmd_size]
 
 
-def pack_calibrate_motor_frequencies(targets):
+def pack_calibrate_motor_frequencies(targets, update_database, save_database):
 	global command_header_counter
 	cdef calibrate_motor_frequencies_command Calibrate
 	cdef char *cp
@@ -316,6 +323,10 @@ def pack_calibrate_motor_frequencies(targets):
 	Calibrate.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Calibrate.Command_Header.Command_Counter = command_header_counter
 	Calibrate.Command_Header.Flags = 0x0
+	if update_database:
+		Calibrate.Command_Header.Flags |= BIT_Update_Database_From_HK
+	if save_database:
+		Calibrate.Command_Header.Flags |= BIT_Save_The_Database
 
 	Calibrate.Msg_Header.Number_Of_Records = npos
 
@@ -419,16 +430,16 @@ def pack_set_current_position(positions):
 		Set_Current_Position.Msg_Record[i].Positioner_Id = positions['Positioner_Id'][i]
 		Set_Current_Position.Msg_Record[i].Position_X = positions['Current_Position_X'][i]
 		Set_Current_Position.Msg_Record[i].Position_Y = positions['Current_Position_Y'][i]
-
-		Set_Current_Position.Msg_Record[i].Flags = 0x0;
 		if positions['fixed_arm'][i]:
-			Set_Current_Position.Msg_Record[i].Flags |= BIT_Fixed_Positioner
+			Set_Current_Position.Msg_Record[i].Flags = BIT_Fixed_Positioner
+		else:
+			Set_Current_Position.Msg_Record[i].Flags = 0x0;
 
 	cp = <char *> &Set_Current_Position
 	return cp[:cmd_size]
 
 
-def pack_move_positioner(positions):
+def pack_move_positioner(positions, unit, use_fast_map):
 	global command_header_counter
 	cdef move_positioner_command Move_Positioner_command
 	cdef char *cp
@@ -445,7 +456,7 @@ def pack_move_positioner(positions):
 	Move_Positioner_command.Command_Header.Time_Stamp1 = int(now)
 	Move_Positioner_command.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Move_Positioner_command.Command_Header.Command_Counter = command_header_counter
-	Move_Positioner_command.Command_Header.Flags = BIT_Step_Count
+	Move_Positioner_command.Command_Header.Flags = unit
 
 	Move_Positioner_command.Msg_Header.Number_Of_Records = npos
 
@@ -454,13 +465,16 @@ def pack_move_positioner(positions):
 		Move_Positioner_command.Msg_Record[i].Positioner_Id = positions['Positioner_Id'][i]
 		Move_Positioner_command.Msg_Record[i].Theta_Joint1 = positions['Theta_Joint1'][i]
 		Move_Positioner_command.Msg_Record[i].Phi_Joint2 = positions['Phi_Joint2'][i]
-		Move_Positioner_command.Msg_Record[i].Flags = (BIT_Theta_Use_Fast_Map | BIT_Phi_Use_Fast_Map)
+		if(use_fast_map):
+			Move_Positioner_command.Msg_Record[i].Flags = (BIT_Theta_Use_Fast_Map | BIT_Phi_Use_Fast_Map)
+		else:
+			Move_Positioner_command.Msg_Record[i].Flags = 0
 
 	cp = <char *> &Move_Positioner_command
 	return cp[:cmd_size]
 
 
-def pack_move_positioner_interval_duration(positions):
+def pack_move_positioner_interval_duration(positions, unit, use_fast_map):
 	global command_header_counter
 	cdef move_positioner_int_dur_command Move_Positioner_Int_Dur
 	cdef char *cp
@@ -477,7 +491,7 @@ def pack_move_positioner_interval_duration(positions):
 	Move_Positioner_Int_Dur.Command_Header.Time_Stamp1 = int(now)
 	Move_Positioner_Int_Dur.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Move_Positioner_Int_Dur.Command_Header.Command_Counter = command_header_counter
-	Move_Positioner_Int_Dur.Command_Header.Flags = BIT_Step_Count
+	Move_Positioner_Int_Dur.Command_Header.Flags = unit
 
 	Move_Positioner_Int_Dur.Msg_Header.Number_Of_Records = npos
 
@@ -490,13 +504,16 @@ def pack_move_positioner_interval_duration(positions):
 		Move_Positioner_Int_Dur.Msg_Record[i].Phi_Joint2 = positions['Phi_Joint2'][i]
 		Move_Positioner_Int_Dur.Msg_Record[i].Phi_Joint2_Interval = positions['Phi_Joint2_Interval'][i]
 		Move_Positioner_Int_Dur.Msg_Record[i].Phi_Joint2_Duration = positions['Phi_Joint2_Duration'][i]
-		Move_Positioner_Int_Dur.Msg_Record[i].Flags = 0
+		if(use_fast_map):
+			Move_Positioner_Int_Dur.Msg_Record[i].Flags = (BIT_Theta_Use_Fast_Map | BIT_Phi_Use_Fast_Map)
+		else:
+			Move_Positioner_Int_Dur.Msg_Record[i].Flags = 0
 
 	cp = <char *> &Move_Positioner_Int_Dur
 	return cp[:cmd_size]
 
 
-def pack_move_positioner_with_delay(positions):
+def pack_move_positioner_with_delay(positions, unit, use_fast_map):
 	global command_header_counter
 	cdef move_positioner_with_delay_command Move_Positioner_With_Delay
 	cdef char *cp
@@ -513,7 +530,7 @@ def pack_move_positioner_with_delay(positions):
 	Move_Positioner_With_Delay.Command_Header.Time_Stamp1 = int(now)
 	Move_Positioner_With_Delay.Command_Header.Time_Stamp2 = int((now - int(now)) * 1000)
 	Move_Positioner_With_Delay.Command_Header.Command_Counter = command_header_counter
-	Move_Positioner_With_Delay.Command_Header.Flags = BIT_Step_Count
+	Move_Positioner_With_Delay.Command_Header.Flags = unit
 
 	Move_Positioner_With_Delay.Msg_Header.Number_Of_Records = npos
 
@@ -524,7 +541,10 @@ def pack_move_positioner_with_delay(positions):
 		Move_Positioner_With_Delay.Msg_Record[i].Phi_Joint2 = positions['Phi_Joint2'][i]
 		Move_Positioner_With_Delay.Msg_Record[i].Delay_Theta_Joint1 = positions['Delay_Theta_Joint1'][i]
 		Move_Positioner_With_Delay.Msg_Record[i].Delay_Phi_Joint2 = positions['Delay_Phi_Joint2'][i]
-		Move_Positioner_With_Delay.Msg_Record[i].Flags = 0
+		if(use_fast_map):
+			Move_Positioner_With_Delay.Msg_Record[i].Flags = (BIT_Theta_Use_Fast_Map | BIT_Phi_Use_Fast_Map)
+		else:
+			Move_Positioner_With_Delay.Msg_Record[i].Flags = 0
 
 	cp = <char *> &Move_Positioner_With_Delay
 	return cp[:cmd_size]

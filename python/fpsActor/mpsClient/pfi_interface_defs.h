@@ -100,6 +100,8 @@ typedef char UChar;
 #define BIT_Kinematics_Failed	0x00200000//22
 #define BIT_DB_Invalid			0x00400000//23
 #define BIT_Get_Fresh_HK_Data	0x00800000//24
+#define BIT_Get_Binary_Database 0x01000000//25
+#define BIT_Update_Database_From_HK     0x02000000//26
 
 
 
@@ -112,7 +114,7 @@ typedef char UChar;
 //Pfi command to MPS IDS
 #define Move_To_Target_ID					(200)
 #define Go_Home_All_ID						(201)//not used anymore
-#define Go_Home_Positioner_ID				(202)
+#define Go_Home_Positioner_ID				(202)//not used anymore
 #define Move_Positoner_ID					(203)
 #define Calibrate_Motor_Frequencies_ID		(204)
 #define Get_Status_Command_ID				(205)
