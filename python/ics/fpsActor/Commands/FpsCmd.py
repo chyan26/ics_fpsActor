@@ -15,7 +15,8 @@ class FpsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
         self.actor = actor
-        self
+    
+        self.db='db-ics'
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -38,6 +39,30 @@ class FpsCmd(object):
                                                       "which defines the fiber positions"),
                                         keys.Key("expTime", types.Float(), 
                                                  help="Seconds for exposure"))
+
+    @property
+    def conn(self):
+        if self._conn is not None:
+            return self._conn
+
+        pwpath=os.path.join(os.environ['ICS_MCSACTOR_DIR'],
+                            "etc", "dbpasswd.cfg")
+
+        try:
+            file = open(pwpath, "r")
+            passstring = file.read()
+        except:
+            raise RuntimeError(f"could not get db password from {pwpath}")
+
+        try:
+            connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
+            self.actor.logger.info(f'connecting to {connString}')
+            conn = psycopg2.connect(connString)
+            self._conn = conn
+        except Exception as e:
+            raise RuntimeError("unable to connect to the database {connString}: {e}")
+
+        return self._conn
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
