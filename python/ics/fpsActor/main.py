@@ -6,8 +6,22 @@ class Fps(actorcore.ICC.ICC):
     def __init__(self, name, productName=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
-        actorcore.Actor.Actor.__init__(self, name, productName=productName,
-                                       modelNames=('mcs','fps','gen2'))
+        actorcore.ICC.ICC.__init__(self, name, productName=productName)
+
+        self.everConnected = False
+
+    def connectionMade(self):
+        if self.everConnected is False:
+            self.everConnected = True
+            self.bcast.inform('text="connection made!"')
+
+            _needModels=('mcs','fps','gen2')
+            self.logger.info(f'adding models: {_needModels}')
+            self.addModels(_needModels)
+            self.logger.info(f'added models: {self.models.keys()}')
+
+            # reactor.callLater(10, self.status_check)
+
 
 def main():
     fps = Fps('fps', 'fpsActor')

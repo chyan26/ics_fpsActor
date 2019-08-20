@@ -1,15 +1,15 @@
-import json
+import pathlib
+import sys
+
 import numpy as np
 import psycopg2
-import psycopg2.extras
-import sys
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
 from opscore.utility.qstr import qstr
 
-from .. import fpsState
+from ics.fpsActor import fpsState
 
 class FpsCmd(object):
     def __init__(self, actor):
@@ -26,15 +26,16 @@ class FpsCmd(object):
             ('status', '', self.status),
             ('loadDesign', 'id', self.loadDesign),
             ('moveToDesign', '', self.moveToDesign),
-            ('cameraTest', '<cnt> [<expTime>] [@noCentroids]', self.cameraTest),
-            ('testloop', '<cnt> [<expTime>]', self.testloop),
+            ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
+            ('testLoop', '<cnt> [<expTime>]', self.testLoop),
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
                                         keys.Key("id", types.Long(),
-                                                 help="fpsDesignId for the field, which defines the fiber positions"),
+                                                 help="fpsDesignId for the field, "
+                                                      "which defines the fiber positions"),
                                         keys.Key("expTime", types.Float(), 
                                                  help="Seconds for exposure"))
 
@@ -56,14 +57,24 @@ class FpsCmd(object):
         cmd.diag('text="FPS ready to go."')
         cmd.finish()
 
+    def _loadPfsDesign(self, cmd, designId):
+        """ Return the pfsDesign for the given pfsDesignId. """
+
+        return None
+
     def loadDesign(self, cmd):
         """ Load our design from the given pfsDesignId. """
 
         designId = cmd.cmd.keywords['id'].values[0]
 
-        ret = self.loadField(designId)
+        try:
+            design = self.loadPfsDesign(designId)
+        except Exception as e:
+            cmd.fail(f'text="Failed to load pfsDesign for pfsSDesignId={designId}: {e}"')
+            return
 
-        cmd.fail("text='Not yet implemented'")
+        fpsState.fpsState.setDesign(designId, design)
+        cmd.finish(f'pfsDesignId={designId:#016x}')
 
     def moveToDesign(self,cmd):
         """ Move cobras to the pfsDesign. """
@@ -72,53 +83,84 @@ class FpsCmd(object):
         cmd.finish()
 
     def _mcsExpose(self, cmd, expTime=None, doCentroid=True):
-        """ Request a single exposure. """
+        """ Request a single MCS exposure, with centroids by default.
+
+        Args
+        ----
+        cmd : `actorcore.Command`
+          What we report back to.
+        expTime : `float`
+          1.0s by default.
+        doCentroid : bool
+          Whether to measure centroids
+
+        Returns
+        -------
+        frameId : `int`
+          The frameId of the image. Should match `mcsData.frameId`
+
+        """
+
+        if expTime is None:
+            expTime = 1.0
 
         cmdString = "expose object expTime=%0.1f %s" % (expTime,
-                                                        'doCentroid' if doCentroids else '')
+                                                        'doCentroid' if doCentroid else '')
         cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
                                       forUserCmd=cmd, timeLim=expTime+10)
         if cmdVar.didFail:
             cmd.warn('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
-            return False
-        return True
+            return None
 
-    def cameraTest(self, cmd):
+        filekey= self.actor.models['mcs'].keyVarDict['filename'][0]
+        filename = pathlib.Path(filekey)
+        visit = int(filename.stem[4:], base=10)
+        cmd.inform(f'visit={visit}')
+
+        return visit
+
+    def testCamera(self, cmd):
         """ Camera Loop Test. """
 
         cmdKeys = cmd.cmd.keywords
-        cnt = cmdKeys["cnt"].values[0]
+        cnt = cmdKeys["cnt"].values[0] \
+              if 'cnt' in cmdKeys \
+                 else 1
         expTime = cmdKeys["expTime"].values[0] \
-            if "expTime" in cmdKeys \
-            else 1.0
+                  if "expTime" in cmdKeys \
+                     else 1.0
         doCentroid = 'noCentroids' not in cmdKeys
 
         for i in range(cnt):
-            cmd.inform(f'text="taking exposure loop {i+1}/cnt"')
-            ret = self._mcsExpose(cmd, expTime=expTime, doCentroid=doCentroid)
-            if not ret:
+            cmd.inform(f'text="taking exposure loop {i+1}/{cnt}"')
+            visit = self._mcsExpose(cmd, expTime=expTime, doCentroid=doCentroid)
+            if not visit:
                 cmd.fail('text="exposure failed"')
                 return
 
         cmd.finish()
 
-    def loopTest(self, cmd):
+    def testLoop(self, cmd):
         """ Run the expose-move loop a few times. For development. """
 
         cmdKeys = cmd.cmd.keywords
-        cnt = cmdKeys["cnt"].values[0]
+        cnt = cmdKeys["cnt"].values[0] \
+              if 'cnt' in cmdKeys \
+                 else 7
         expTime = cmdKeys["expTime"].values[0] \
             if "expTime" in cmdKeys \
-            else 1.0
+            else None
 
         for i in range(cnt):
-            cmd.inform('text="loop = "%i'%(i))
-            cmdString = "centroidOnDummy expTime=%0.1f" % (expTime)
-            cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
-                                          forUserCmd=cmd, timeLim=expTime)
+            cmd.inform(f'text="taking exposure loop {i+1}/{cnt}"')
+            visit = self._mcsExpose(cmd, expTime=expTime, doCentroid=True)
+            if not visit:
+                cmd.fail('text="exposure failed"')
+                return
 
-            if cmdVar.didFail:
-                 cmd.fail('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
+        # Can look up frameId == visit in mcsData....
+
+        cmd.finish()
 
 #            rawCentroids = self.actor.models['mcs'].keyVarDict['centroidsChunk'][0]
 #         expTime = cmd.cmd.keywords["expTime"].values[0] \
