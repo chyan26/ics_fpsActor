@@ -24,7 +24,7 @@ class FpsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
-            ('loadDesign', 'id', self.loadDesign),
+            ('loadDesign', '<id>', self.loadDesign),
             ('moveToDesign', '', self.moveToDesign),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
             ('testLoop', '<cnt> [<expTime>]', self.testLoop),
@@ -60,6 +60,8 @@ class FpsCmd(object):
     def _loadPfsDesign(self, cmd, designId):
         """ Return the pfsDesign for the given pfsDesignId. """
 
+        cmd.warn(f'text="have a pfsDesignId={designId:#016x}, but do not know how to fetch it yet."')
+
         return None
 
     def loadDesign(self, cmd):
@@ -68,7 +70,7 @@ class FpsCmd(object):
         designId = cmd.cmd.keywords['id'].values[0]
 
         try:
-            design = self.loadPfsDesign(designId)
+            design = self._loadPfsDesign(cmd, designId)
         except Exception as e:
             cmd.fail(f'text="Failed to load pfsDesign for pfsSDesignId={designId}: {e}"')
             return
