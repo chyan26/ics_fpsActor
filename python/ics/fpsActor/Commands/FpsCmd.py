@@ -3,6 +3,8 @@ import sys
 
 import numpy as np
 import psycopg2
+import io
+import pandas as pd
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
@@ -145,6 +147,78 @@ class FpsCmd(object):
         cmd.inform(f'visit={visit}')
 
         return visit
+
+    def _readFFPosition(self, conn):
+        """ Read positions of all fidicial fibers"""
+    
+        buf = io.StringIO()
+
+        cmd = f"""copy (select * from "FiducialFiberPosition") to stdout delimiter ',' """
+
+        with conn.cursor() as curs:
+            curs.copy_expert(cmd, buf)
+        conn.commit()
+        buf.seek(0,0)
+
+        # Skip the frameId, etc. columns.
+        arr = np.genfromtxt(buf, dtype='f4',
+                    delimiter=',',usecols=(0,1,6,7))
+
+
+        d = {'ffID': arr[:,0], 'fiberID': arr[:,0], 'x': arr[:,1], 'y':arr[:,2]}
+
+        df=pd.DataFrame(data=d)
+
+
+        return df
+
+    def _readSFPosition(self, conn):
+        """ Read positions of all science fibers"""
+    
+        buf = io.StringIO()
+
+        cmd = f"""copy (select * from "FiberPosition") to stdout delimiter ',' """
+
+        with conn.cursor() as curs:
+            curs.copy_expert(cmd, buf)
+        conn.commit()
+        buf.seek(0,0)
+
+        # Skip the frameId, etc. columns.
+        arr = np.genfromtxt(buf, dtype='f4',
+                    delimiter=',',usecols=(0,1,2))
+
+        d = {'fiberID': arr[:,0], 'x': arr[:,1], 'y':arr[:,2]}
+
+        df=pd.DataFrame(data=d)
+
+
+        return df
+
+    def _readCentroid(self, conn, frameId, moveId):
+        """ Read centroid information from databse"""
+    
+        buf = io.StringIO()
+
+        cmd = f"""copy (select "fiberId", "centroidx", "centroidy" from "mcsData"
+                where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+
+        with conn.cursor() as curs:
+            curs.copy_expert(cmd, buf)
+        conn.commit()
+        buf.seek(0,0)
+
+        # Skip the frameId, etc. columns.
+        arr = np.genfromtxt(buf, dtype='f4',
+                    delimiter=',',usecols=(0,1,2))
+
+        d = {'fiberID': arr[:,0], 'centroidx': arr[:,1], 'centroidy':arr[:,2]}
+
+        df=pd.DataFrame(data=d)
+
+
+        return df
+
 
     def testCamera(self, cmd):
         """ Camera Loop Test. """
