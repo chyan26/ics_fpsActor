@@ -5,6 +5,8 @@ import numpy as np
 import psycopg2
 import io
 import pandas as pd
+from pfs.utils.coordinates import CoordTransp
+from pfs.utils.coordinates import DistortionCoefficients
 
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
@@ -17,8 +19,9 @@ class FpsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
         self.actor = actor
-    
+        
         self.db='db-ics'
+        self.conn = None
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -29,6 +32,7 @@ class FpsCmd(object):
             ('status', '', self.status),
             ('loadDesign', '<id>', self.loadDesign),
             ('moveToDesign', '', self.moveToDesign),
+            ('testFFdistortion', '', self.testFFdistortion),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
             ('testLoop', '<cnt> [<expTime>]', self.testLoop),
         ]
@@ -148,9 +152,10 @@ class FpsCmd(object):
 
         return visit
 
-    def _readFFPosition(self, conn):
+    def _readFFPosition(self):
         """ Read positions of all fidicial fibers"""
-    
+
+        conn = self.conn 
         buf = io.StringIO()
 
         cmd = f"""copy (select * from "FiducialFiberPosition") to stdout delimiter ',' """
@@ -172,9 +177,10 @@ class FpsCmd(object):
 
         return df
 
-    def _readSFPosition(self, conn):
+    def _readSFPosition(self):
         """ Read positions of all science fibers"""
-    
+        conn = self.conn 
+
         buf = io.StringIO()
 
         cmd = f"""copy (select * from "FiberPosition") to stdout delimiter ',' """
@@ -195,9 +201,10 @@ class FpsCmd(object):
 
         return df
 
-    def _readCentroid(self, conn, frameId, moveId):
+    def _readCentroid(self, frameId, moveId):
         """ Read centroid information from databse"""
-    
+        conn = self.conn 
+
         buf = io.StringIO()
 
         cmd = f"""copy (select "fiberId", "centroidx", "centroidy" from "mcsData"
@@ -219,6 +226,91 @@ class FpsCmd(object):
 
         return df
 
+    def _findHomes(centroids,fibrePos,tol):
+    
+        """
+        Do nearest neighbour matching on a set of centroids (ie, home position case).
+        The routine is flexible with the number of paramters in the centroid array - they 
+        will all be copied to the output array. 
+        Input: 
+        centroids: centroid array in the form
+            id,x,y,other parameters.....
+        fibrePos: expected positions, (Nx3) array with first column as index
+        tol: maximum separation for match, in pixels
+        Returns: sorted array with index in the first column
+    
+        """
+
+        #get shape of output array
+        n=len(fibrePos[:,0])
+        nparm=centroids.shape[1]
+
+        #create an array to hold the output
+        outArray=np.zeros((n,nparm))
+
+        #now do the matching
+        for i in range(n):
+
+            dd=dist(fibrePos[i,1],fibrePos[i,2],centroids[:,1],centroids[:,2])
+            ind=np.argmin(dd)
+            #found an acceptable match
+            if(dd[ind] < tol):
+                outArray[i,:]=centroids[ind,:]
+
+            #otherwise set values to NaN
+            else:
+                outArray[i,:]=np.empty((nparm)).fill(np.nan)
+
+            #and assign the index
+            outArray[i,0]=fibrePos[i,0]
+
+        #convert to masked array, masking unfound points
+        outArray=ma.masked_where(outArray!=outArray,outArray)
+
+        return outArray
+
+
+    def testFFdistortion(self, cmd):
+        """ Checking distortion with fidicial fibers.  """
+        conn = self.conn
+        
+        frameId= 16493
+        moveId = 1
+
+        offset=[0,-85]
+        rotCent=[[4471],[2873]]
+
+        za = 0
+        inr = 0
+
+        inr=inr-180
+        if(inr < 0):
+            inr=inr+360
+
+
+        mcsData = self._readCentroid(conn, frameId, moveId)
+        ffData = self._readFFPosition(conn)
+        sfData = self._readSFPosition(conn)
+
+        xx=np.array([np.concatenate([ffData['x']])]).ravel()
+        yy=np.array([np.concatenate([ffData['y']])]).ravel()
+
+
+        xx-=offset[0]
+        yy-=offset[1]
+
+        #correect input format
+        xyin=np.array([mcsData['centroidx'],mcsData['centroidy']])
+
+
+        #call the routine
+        xyout=CoordTransp.CoordinateTransform(xyin,za,'mcs_pfi',inr=inr,cent=rotCent)
+
+        d = {'ffID': np.arange(len(xyout[0])), 'pfix': xyout[0], 'pfiy': xyout[1]}
+        transPos=pd.DataFrame(data=d) 
+        
+        
+        pass
 
     def testCamera(self, cmd):
         """ Camera Loop Test. """
