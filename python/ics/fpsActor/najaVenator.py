@@ -1,10 +1,12 @@
 
 import io
+import os
+import numpy as np
 import pandas as pd
 import psycopg2
 
 
-class najaVenator:
+class NajaVenator(object):
     """ 
         A class of interface providing connection capability with opDB. 
         Naja is the genus name of cobra and venator is latin word for hunter.  
@@ -12,10 +14,9 @@ class najaVenator:
     """
     def __init__(self):
         
-        self.db='db-ics'
-        self.conn = None
+        self.db='localhost'
+        self._conn = None
         
-        pass
     
     @property
     def conn(self):
@@ -33,7 +34,7 @@ class najaVenator:
 
         try:
             connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
-            self.actor.logger.info(f'connecting to {connString}')
+            # Skipself.actor.logger.info(f'connecting to {connString}')
             conn = psycopg2.connect(connString)
             self._conn = conn
         except Exception as e:
@@ -41,7 +42,7 @@ class najaVenator:
 
         return self._conn
 
-    def readFFConfg(self):
+    def readFFConfig(self):
         """ Read positions of all fidicial fibers"""
 
         conn = self.conn 
@@ -59,7 +60,7 @@ class najaVenator:
                     delimiter=',',usecols=(0,1,6,7))
 
 
-        d = {'ffID': arr[:,0], 'fiberID': arr[:,0], 'x': arr[:,1], 'y':arr[:,2]}
+        d = {'ffID': arr[:,0], 'fiberID': arr[:,1], 'x': arr[:,2], 'y':arr[:,3]}
 
         df=pd.DataFrame(data=d)
 
@@ -97,7 +98,7 @@ class najaVenator:
         buf = io.StringIO()
 
         cmd = f"""copy (select "fiberId", "centroidx", "centroidy" from "mcsData"
-                where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
+                where "frameId"={frameId} and "moveId"={moveId}) to stdout delimiter ',' """
 
         with conn.cursor() as curs:
             curs.copy_expert(cmd, buf)
@@ -119,4 +120,4 @@ class najaVenator:
             self.conn.close()
         pass
 
-najaVenator = NajaVenator()
+#NajaVenator = najaVenator()

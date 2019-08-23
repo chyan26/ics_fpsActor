@@ -21,8 +21,8 @@ class FpsCmd(object):
         # This lets us access the rest of the actor.
         self.actor = actor
         
-        self.db='db-ics'
-        self.conn = None
+        self.nv = najaVenator
+
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -46,30 +46,6 @@ class FpsCmd(object):
                                                       "which defines the fiber positions"),
                                         keys.Key("expTime", types.Float(), 
                                                  help="Seconds for exposure"))
-
-    @property
-    def conn(self):
-        if self._conn is not None:
-            return self._conn
-
-        pwpath=os.path.join(os.environ['ICS_MCSACTOR_DIR'],
-                            "etc", "dbpasswd.cfg")
-
-        try:
-            file = open(pwpath, "r")
-            passstring = file.read()
-        except:
-            raise RuntimeError(f"could not get db password from {pwpath}")
-
-        try:
-            connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
-            self.actor.logger.info(f'connecting to {connString}')
-            conn = psycopg2.connect(connString)
-            self._conn = conn
-        except Exception as e:
-            raise RuntimeError("unable to connect to the database {connString}: {e}")
-
-        return self._conn
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -153,80 +129,7 @@ class FpsCmd(object):
 
         return visit
 
-    def _readFFPosition(self):
-        """ Read positions of all fidicial fibers"""
-
-        conn = self.conn 
-        buf = io.StringIO()
-
-        cmd = f"""copy (select * from "FiducialFiberPosition") to stdout delimiter ',' """
-
-        with conn.cursor() as curs:
-            curs.copy_expert(cmd, buf)
-        conn.commit()
-        buf.seek(0,0)
-
-        # Skip the frameId, etc. columns.
-        arr = np.genfromtxt(buf, dtype='f4',
-                    delimiter=',',usecols=(0,1,6,7))
-
-
-        d = {'ffID': arr[:,0], 'fiberID': arr[:,0], 'x': arr[:,1], 'y':arr[:,2]}
-
-        df=pd.DataFrame(data=d)
-
-
-        return df
-
-    def _readSFPosition(self):
-        """ Read positions of all science fibers"""
-        conn = self.conn 
-
-        buf = io.StringIO()
-
-        cmd = f"""copy (select * from "FiberPosition") to stdout delimiter ',' """
-
-        with conn.cursor() as curs:
-            curs.copy_expert(cmd, buf)
-        conn.commit()
-        buf.seek(0,0)
-
-        # Skip the frameId, etc. columns.
-        arr = np.genfromtxt(buf, dtype='f4',
-                    delimiter=',',usecols=(0,1,2))
-
-        d = {'fiberID': arr[:,0], 'x': arr[:,1], 'y':arr[:,2]}
-
-        df=pd.DataFrame(data=d)
-
-
-        return df
-
-    def _readCentroid(self, frameId, moveId):
-        """ Read centroid information from databse"""
-        conn = self.conn 
-
-        buf = io.StringIO()
-
-        cmd = f"""copy (select "fiberId", "centroidx", "centroidy" from "mcsData"
-                where frameId={frameId} and moveId={moveId}) to stdout delimiter ',' """
-
-        with conn.cursor() as curs:
-            curs.copy_expert(cmd, buf)
-        conn.commit()
-        buf.seek(0,0)
-
-        # Skip the frameId, etc. columns.
-        arr = np.genfromtxt(buf, dtype='f4',
-                    delimiter=',',usecols=(0,1,2))
-
-        d = {'fiberID': arr[:,0], 'centroidx': arr[:,1], 'centroidy':arr[:,2]}
-
-        df=pd.DataFrame(data=d)
-
-
-        return df
-
+    
     def _findHomes(centroids,fibrePos,tol):
     
         """
@@ -289,9 +192,9 @@ class FpsCmd(object):
             inr=inr+360
 
 
-        mcsData = self._readCentroid(conn, frameId, moveId)
-        ffData = self._readFFPosition(conn)
-        sfData = self._readSFPosition(conn)
+        mcsData = self.nv.readCentroid(conn, frameId, moveId)
+        ffData = self.nv.readFFConfig(conn)
+        sfData = self.nv.readCobraConfig(conn)
 
         xx=np.array([np.concatenate([ffData['x']])]).ravel()
         yy=np.array([np.concatenate([ffData['y']])]).ravel()
