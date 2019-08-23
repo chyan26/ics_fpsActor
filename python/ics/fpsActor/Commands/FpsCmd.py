@@ -14,6 +14,7 @@ import opscore.protocols.types as types
 from opscore.utility.qstr import qstr
 
 from ics.fpsActor import fpsState
+from ics.fpfActor import najaVenator
 
 class FpsCmd(object):
     def __init__(self, actor):
