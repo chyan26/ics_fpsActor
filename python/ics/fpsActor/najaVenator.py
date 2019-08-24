@@ -115,6 +115,21 @@ class NajaVenator(object):
 
         return df
 
+    def readTelescopeInform(self, frameId):
+        conn = self.conn 
+
+        buf = io.StringIO()
+
+        cmd = f"""copy (select * from "mcsexposure"
+                where "frameId"={frameId}) to stdout delimiter ',' """
+
+        with conn.cursor() as curs:
+            curs.copy_expert(cmd, buf)
+        conn.commit()
+        buf.seek(0,0)
+
+
+
     def __del__(self):
         if self.conn is not None:
             self.conn.close()
