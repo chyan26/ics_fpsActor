@@ -60,7 +60,7 @@ class NajaVenator(object):
                     delimiter=',',usecols=(0,1,6,7))
 
 
-        d = {'ffID': arr[:,0], 'fiberID': arr[:,1], 'x': arr[:,2], 'y':arr[:,3]}
+        d = {'ID': arr[:,0], 'fiberID': arr[:,1], 'x': arr[:,2], 'y':arr[:,3]}
 
         df=pd.DataFrame(data=d)
 
@@ -82,9 +82,9 @@ class NajaVenator(object):
 
         # Skip the frameId, etc. columns.
         arr = np.genfromtxt(buf, dtype='f4',
-                    delimiter=',',usecols=(0,1,2))
+                    delimiter=',',usecols=(0,1,2,3))
 
-        d = {'fiberID': arr[:,0], 'x': arr[:,1], 'y':arr[:,2]}
+        d = {'fiberID': arr[:,0], 'x': arr[:,2], 'y':arr[:,3]}
 
         df=pd.DataFrame(data=d)
 
@@ -119,16 +119,24 @@ class NajaVenator(object):
         conn = self.conn 
 
         buf = io.StringIO()
-
+        
+        frameId = frameId*100
+        
         cmd = f"""copy (select * from "mcsexposure"
-                where "frameId"={frameId}) to stdout delimiter ',' """
+                where "frameid"={frameId}) to stdout delimiter ',' """
 
         with conn.cursor() as curs:
             curs.copy_expert(cmd, buf)
         conn.commit()
         buf.seek(0,0)
 
+        arr = np.genfromtxt(buf, dtype='f4',
+                    delimiter=',',usecols=range(7))
+        #print(arr.shape)
+        d = {'frameId': arr[1]/100, 'alt': arr[4], 'azi': arr[5], 'instrot':arr[6]}
 
+        return d
+        
 
     def __del__(self):
         if self.conn is not None:

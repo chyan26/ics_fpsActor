@@ -23,6 +23,8 @@ class FpsCmd(object):
         self.actor = actor
         
         self.nv = najaVenator.NajaVenator()
+
+        self.tranMatrix = None
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -33,7 +35,7 @@ class FpsCmd(object):
             ('status', '', self.status),
             ('loadDesign', '<id>', self.loadDesign),
             ('moveToDesign', '', self.moveToDesign),
-            ('testFFdistortion', '', self.testFFdistortion),
+            ('getAEfromFF', '', self.getAEfromFF),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
             ('testLoop', '<cnt> [<expTime>]', self.testLoop),
         ]
@@ -141,14 +143,14 @@ class FpsCmd(object):
         oriy=[]
         px = []
         py = []
-
+        fiberid = []
         for index, row in baseData.iterrows():
             dist=np.sqrt((row['x']-poolData['pfix'])**2 + (row['y']-poolData['pfiy'])**2)
             ind=pd.Series.idxmin(dist)
-            print(dist)
-            print(ind)
+
             orix.append(row['x'])
             oriy.append(row['y'])
+            fiberid.append(row['fiberID'])
             if(min(dist) < 10):
                 px.append(poolData['pfix'][ind])
                 py.append(poolData['pfiy'][ind])
@@ -157,12 +159,12 @@ class FpsCmd(object):
                 px.append(np.nan)
                 py.append(np.nan)
             
-        d = {'ID': np.arange(len(orix)), 'orix': orix, 'oriy': oriy, 'pfix': px, 'pfiy': py}
+        d = {'fiberID': fiberid, 'orix': orix, 'oriy': oriy, 'pfix': px, 'pfiy': py}
         match = pd.DataFrame(data=d)
 
-        return 
+        return match
 
-    def testFFdistortion(self, cmd):
+    def getAEfromFF(self, cmd):
         """ Checking distortion with fidicial fibers.  """
         
         frameId= 16493
@@ -171,13 +173,13 @@ class FpsCmd(object):
         offset=[0,-85]
         rotCent=[[4471],[2873]]
 
-        za = 0
-        inr = 0
+        telInform = self.nv.readTelescopeInform(frameId)
+        za = 90-telInform['azi']
+        inr = telInform['instrot']
 
         inr=inr-180
         if(inr < 0):
             inr=inr+360
-
 
         mcsData = self.nv.readCentroid(frameId, moveId)
         ffData = self.nv.readFFConfig()
@@ -219,9 +221,52 @@ class FpsCmd(object):
         mat['angle']=np.arctan2(afCoeff[1,0]/np.sqrt(afCoeff[0,0]**2+afCoeff[0,1]**2),
                                     afCoeff[1,1]/np.sqrt(afCoeff[1,0]**2+afCoeff[1,1]**2))
 
-        transMatrix = pd.DataFrame(data=mat)
 
-        pass
+        return mat
+    
+    def applyAEonCobra(self, cmd):
+        frameId= 16493
+        moveId = 1
+
+        offset=[0,-85]
+        rotCent=[[4471],[2873]]
+
+
+        mcsData = nv.readCentroid(frameId, moveId)
+        sfData = nv.readCobraConfig()
+
+        sfData['x']-=offset[0]
+        sfData['y']-=offset[1]
+
+
+
+        #correect input format
+        xyin=np.array([mcsData['centroidx'],mcsData['centroidy']])
+
+        #call the routine
+        xyout=CoordTransp.CoordinateTransform(xyin,za,'mcs_pfi',inr=inr,cent=rotCent)
+
+        d = {'ffID': np.arange(len(xyout[0])), 'pfix': xyout[0], 'pfiy': xyout[1]}
+        transPos=pd.DataFrame(data=d) 
+
+        pts2=np.zeros((1,len(transPos['pfix']),2))
+
+        pts2[0,:,0]=transPos['pfix']
+        pts2[0,:,1]=transPos['pfiy']
+
+
+        afCor=cv2.transform(pts2,mat['affineCoeff'])
+        xx=tt[0,:,0]
+        yy=tt[0,:,1]
+
+        d = {'ffID': np.arange(len(afCor[0,:,0])), 'mcsx': afCor[0,:,0], 'mcsy': afCor[0,:,1]}
+        mcs=pd.DataFrame(data=d) 
+        match = _findHomes(sfData, transPos)
+
+        match['dx'] = match['orix'] - match['pfix']
+        match['dy'] = match['oriy'] - match['pfiy']
+        
+        return match
 
     def testCamera(self, cmd):
         """ Camera Loop Test. """
