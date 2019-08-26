@@ -14,7 +14,7 @@ class NajaVenator(object):
     """
     def __init__(self):
         
-        self.db='localhost'
+        self.db='db-ics'
         self._conn = None
         
     
@@ -48,7 +48,7 @@ class NajaVenator(object):
         conn = self.conn 
         buf = io.StringIO()
 
-        cmd = f"""copy (select * from "FiducialFiberPosition") to stdout delimiter ',' """
+        cmd = f"""copy (select * from "FiberPosition" where "ftype" == "ff") to stdout delimiter ',' """
 
         with conn.cursor() as curs:
             curs.copy_expert(cmd, buf)
@@ -57,10 +57,10 @@ class NajaVenator(object):
 
         # Skip the frameId, etc. columns.
         arr = np.genfromtxt(buf, dtype='f4',
-                    delimiter=',',usecols=(0,1,6,7))
+                    delimiter=',',usecols=(0,1,2,3))
 
 
-        d = {'ID': arr[:,0], 'fiberID': arr[:,1], 'x': arr[:,2], 'y':arr[:,3]}
+        d = {'fiberID': arr[:,0], 'x': arr[:,2], 'y':arr[:,3]}
 
         df=pd.DataFrame(data=d)
 
@@ -73,7 +73,7 @@ class NajaVenator(object):
 
         buf = io.StringIO()
 
-        cmd = f"""copy (select * from "FiberPosition") to stdout delimiter ',' """
+        cmd = f"""copy (select * from "FiberPosition" where "ftype" == "cobra") to stdout delimiter ',' """
 
         with conn.cursor() as curs:
             curs.copy_expert(cmd, buf)
