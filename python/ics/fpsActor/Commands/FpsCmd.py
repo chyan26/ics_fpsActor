@@ -37,7 +37,7 @@ class FpsCmd(object):
             ('moveToDesign', '', self.moveToDesign),
             ('getAEfromFF', '', self.getAEfromFF),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
-            ('testLoop', '<cnt> [<expTime>] [<visit>]', self.testLoop),
+            ('testLoop', '[<cnt>] [<expTime>] [<visit>]', self.testLoop),
         ]
 
         # Define typed command arguments for the above commands.
@@ -119,10 +119,10 @@ class FpsCmd(object):
         if expTime is None:
             expTime = 1.0
 
-        cmdString = "expose object frameId=%d expTime=%0.1f %s" % (expTime, frameId,
+        cmdString = "expose object frameId=%d expTime=%0.1f %s" % (frameId, expTime,
                                                                    'doCentroid' if doCentroid else '')
         cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
-                                      forUserCmd=cmd, timeLim=expTime+10)
+                                      forUserCmd=cmd, timeLim=expTime+30)
         if cmdVar.didFail:
             cmd.warn('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
             return None
