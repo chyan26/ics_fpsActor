@@ -37,15 +37,16 @@ class FpsCmd(object):
             ('moveToDesign', '', self.moveToDesign),
             ('getAEfromFF', '', self.getAEfromFF),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
-            ('testLoop', '<cnt> [<expTime>]', self.testLoop),
+            ('testLoop', '<cnt> [<expTime>] [<visit>]', self.testLoop),
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
+                                        keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("id", types.Long(),
-                                                 help="fpsDesignId for the field, "
-                                                      "which defines the fiber positions"),
+                                                 help=("fpsDesignId for the field, "
+                                                       "which defines the fiber positions")),
                                         keys.Key("expTime", types.Float(), 
                                                  help="Seconds for exposure"))
 
@@ -94,13 +95,15 @@ class FpsCmd(object):
         raise NotImplementedError('moveToDesign')
         cmd.finish()
 
-    def _mcsExpose(self, cmd, expTime=None, doCentroid=True):
+    def _mcsExpose(self, cmd, frameId, expTime=None, doCentroid=True):
         """ Request a single MCS exposure, with centroids by default.
 
         Args
         ----
         cmd : `actorcore.Command`
           What we report back to.
+        frameId : `int`
+          The full 8-digit frame number for the MCS
         expTime : `float`
           1.0s by default.
         doCentroid : bool
@@ -116,8 +119,8 @@ class FpsCmd(object):
         if expTime is None:
             expTime = 1.0
 
-        cmdString = "expose object expTime=%0.1f %s" % (expTime,
-                                                        'doCentroid' if doCentroid else '')
+        cmdString = "expose object frameId=%d expTime=%0.1f %s" % (expTime, frameId,
+                                                                   'doCentroid' if doCentroid else '')
         cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
                                       forUserCmd=cmd, timeLim=expTime+10)
         if cmdVar.didFail:
@@ -126,12 +129,11 @@ class FpsCmd(object):
 
         filekey= self.actor.models['mcs'].keyVarDict['filename'][0]
         filename = pathlib.Path(filekey)
-        visit = int(filename.stem[4:], base=10)
-        cmd.inform(f'visit={visit}')
+        frameId = int(filename.stem[4:], base=10)
+        cmd.inform(f'frameId={frameId}')
 
-        return visit
+        return frameId
 
-    
     def _findHomes(baseData,poolData):
     
         """
@@ -300,31 +302,30 @@ class FpsCmd(object):
         """ Run the expose-move loop a few times. For development. """
 
         cmdKeys = cmd.cmd.keywords
+        visit = cmdKeys["visit"].values[0] \
+            if 'visit' in cmdKeys \
+            else None
         cnt = cmdKeys["cnt"].values[0] \
-              if 'cnt' in cmdKeys \
-                 else 7
+            if 'cnt' in cmdKeys \
+               else 7
         expTime = cmdKeys["expTime"].values[0] \
             if "expTime" in cmdKeys \
             else None
 
         for i in range(cnt):
+            frameId = 100*visit + i
             cmd.inform(f'text="taking exposure loop {i+1}/{cnt}"')
-            visit = self._mcsExpose(cmd, expTime=expTime, doCentroid=True)
-            if not visit:
+            frameId = self._mcsExpose(cmd, frameId, expTime=expTime, doCentroid=True)
+            if not frameId:
                 cmd.fail('text="exposure failed"')
-
                 return
-            
-            cmd.inform('text="Exposure finished." ')
-            # Look up frame ID
-            mcsFilename = self.actor.models['mcs'].keyVarDict['filename'].getValue()
-            frameId = int(pathlib.Path(mcsFilename).stem[4:], base=10)
-            if (i == 0):
 
+            cmd.inform('text="Exposure finished." ')
+
+            if (i == 0):
                 cmd.inform('text="Apply distrotion correction and getting Affine coefficients." ')
                 self.getAEfromFF(cmd, frameId)
 
-            
         # Can look up frameId == visit in mcsData....
 
         cmd.finish()
