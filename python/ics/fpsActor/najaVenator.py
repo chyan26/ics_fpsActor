@@ -29,7 +29,7 @@ class NajaVenator(object):
             conn = psycopg2.connect(connString)
             self._conn = conn
         except Exception as e:
-            raise RuntimeError("unable to connect to the database {connString}: {e}")
+            raise RuntimeError(f"unable to connect to the database {connString}: {e}")
 
         return self._conn
 
@@ -39,7 +39,7 @@ class NajaVenator(object):
         conn = self.conn 
         buf = io.StringIO()
 
-        cmd = f"""copy (select * from "FiberPosition" where "ftype" == "ff") to stdout delimiter ',' """
+        cmd = f"""copy (select * from "FiberPosition" where "ftype" = 'ff') to stdout delimiter ',' """
 
         with conn.cursor() as curs:
             curs.copy_expert(cmd, buf)
@@ -111,8 +111,6 @@ class NajaVenator(object):
 
         buf = io.StringIO()
         
-        frameId = frameId*100
-        
         cmd = f"""copy (select * from "mcsexposure"
                 where "frameid"={frameId}) to stdout delimiter ',' """
 
@@ -122,9 +120,9 @@ class NajaVenator(object):
         buf.seek(0,0)
 
         arr = np.genfromtxt(buf, dtype='f4',
-                    delimiter=',',usecols=range(7))
+                            delimiter=',',usecols=range(7))
         #print(arr.shape)
-        d = {'frameId': arr[1]/100, 'alt': arr[4], 'azi': arr[5], 'instrot':arr[6]}
+        d = {'frameId': arr[1], 'alt': arr[4], 'azi': arr[5], 'instrot':arr[6]}
 
         return d
         
