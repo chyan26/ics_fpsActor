@@ -134,7 +134,7 @@ class FpsCmd(object):
 
         return frameId
 
-    def _findHomes(baseData,poolData):
+    def _findHomes(self, baseData,poolData):
     
         """
         Do nearest neighbour matching on a set of centroids (ie, home position case).
@@ -270,7 +270,7 @@ class FpsCmd(object):
 
         d = {'ffID': np.arange(len(afCor[0,:,0])), 'mcsx': afCor[0,:,0], 'mcsy': afCor[0,:,1]}
         mcs=pd.DataFrame(data=d) 
-        match = _findHomes(sfData, mcs)
+        match = self._findHomes(sfData, mcs)
 
         match['dx'] = match['orix'] - match['pfix']
         match['dy'] = match['oriy'] - match['pfiy']
