@@ -15,7 +15,7 @@ import opscore.protocols.types as types
 from opscore.utility.qstr import qstr
 
 from ics.fpsActor import fpsState
-from ics.fpfActor import najaVenator
+from ics.fpsActor import najaVenator
 
 class FpsCmd(object):
     def __init__(self, actor):
@@ -164,10 +164,10 @@ class FpsCmd(object):
 
         return match
 
-    def getAEfromFF(self, cmd):
+    def getAEfromFF(self, cmd, frameId):
         """ Checking distortion with fidicial fibers.  """
         
-        frameId= 16493
+        #frameId= frameID
         moveId = 1
 
         offset=[0,-85]
@@ -222,15 +222,21 @@ class FpsCmd(object):
                                     afCoeff[1,1]/np.sqrt(afCoeff[1,0]**2+afCoeff[1,1]**2))
 
 
-        return mat
+        self.tranMatrix = mat
     
-    def applyAEonCobra(self, cmd):
-        frameId= 16493
+    def applyAEonCobra(self, cmd, frameId):
+        
+        #frameId= 16493
         moveId = 1
 
         offset=[0,-85]
-        rotCent=[[4471],[2873]]
 
+        telInform = self.nv.readTelescopeInform(frameId)
+        za = 90-telInform['azi']
+        inr = telInform['instrot']
+        inr=inr-180
+        if(inr < 0):
+            inr=inr+360
 
         mcsData = nv.readCentroid(frameId, moveId)
         sfData = nv.readCobraConfig()
@@ -238,6 +244,7 @@ class FpsCmd(object):
         sfData['x']-=offset[0]
         sfData['y']-=offset[1]
 
+        
 
 
         #correect input format
@@ -255,13 +262,13 @@ class FpsCmd(object):
         pts2[0,:,1]=transPos['pfiy']
 
 
-        afCor=cv2.transform(pts2,mat['affineCoeff'])
-        xx=tt[0,:,0]
-        yy=tt[0,:,1]
+        afCor=cv2.transform(pts2,self.tranMatrix['affineCoeff'])
+        #xx=afCor[0,:,0]
+        #yy=afCor[0,:,1]
 
         d = {'ffID': np.arange(len(afCor[0,:,0])), 'mcsx': afCor[0,:,0], 'mcsy': afCor[0,:,1]}
         mcs=pd.DataFrame(data=d) 
-        match = _findHomes(sfData, transPos)
+        match = _findHomes(sfData, mcs)
 
         match['dx'] = match['orix'] - match['pfix']
         match['dy'] = match['oriy'] - match['pfiy']
@@ -305,8 +312,19 @@ class FpsCmd(object):
             visit = self._mcsExpose(cmd, expTime=expTime, doCentroid=True)
             if not visit:
                 cmd.fail('text="exposure failed"')
-                return
 
+                return
+            
+            cmd.inform('text="Exposure finished." ')
+            # Look up frame ID
+            mcsFilename = self.actor.models['mcs'].keyVarDict['filename'].getValue()
+            frameId = int(pathlib.Path(mcsFilename).stem[4:], base=10)
+            if (i == 0):
+
+                cmd.inform('text="Apply distrotion correction and getting Affine coefficients." ')
+                self.getAEfromFF(cmd, frameId)
+
+            
         # Can look up frameId == visit in mcsData....
 
         cmd.finish()

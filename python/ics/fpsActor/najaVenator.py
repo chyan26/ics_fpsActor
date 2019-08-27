@@ -23,17 +23,8 @@ class NajaVenator(object):
         if self._conn is not None:
             return self._conn
 
-        pwpath=os.path.join(os.environ['ICS_MCSACTOR_DIR'],
-                            "etc", "dbpasswd.cfg")
-
         try:
-            file = open(pwpath, "r")
-            passstring = file.read()
-        except:
-            raise RuntimeError(f"could not get db password from {pwpath}")
-
-        try:
-            connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
+            connString = "dbname='opdb' user='pfs' host="+self.db
             # Skipself.actor.logger.info(f'connecting to {connString}')
             conn = psycopg2.connect(connString)
             self._conn = conn
@@ -137,6 +128,9 @@ class NajaVenator(object):
 
         return d
         
+    def writeTelescopeInform(self, data):
+
+        pass
 
     def __del__(self):
         if self.conn is not None:
