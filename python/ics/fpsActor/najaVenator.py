@@ -135,12 +135,6 @@ class NajaVenator(object):
         #np.savetxt(measBuf, centArr[:,1:7], delimiter=',', fmt='%0.6g')
         measBuf.seek(0,0)
 
-
-        #connString = "dbname='opdb' user='pfs' host=db-ics"
-                    # Skipself.actor.logger.info(f'connecting to {connString}')
-        #conn = psycopg2.connect(connString)
-
-
         colname = ['"fiberId"','"mcsId"', '"pfiNominal_x"', '"pfiNominal_y"','"pfiCenter_x"', '"pfiCenter_y"','"mcsCenter_x"',
         '"mcsCenter_y"','"pfiDiff_x"','"pfiDiff_y"',]
             
