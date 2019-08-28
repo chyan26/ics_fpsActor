@@ -97,15 +97,11 @@ class NajaVenator(object):
         buf.seek(0,0)
 
         # Skip the frameId, etc. columns.
-        arr = np.genfromtxt(buf, dtype=['i4','i4','f4','f4'],
+        arr = np.genfromtxt(buf, dtype=[("mcsId",'i4'),("fiberID",'i4'),("centroidx",'f4'),("centroidy",'f4')],
                     delimiter=',',usecols=(0,1,2,3))
 
-        d = {"mcsId": arr['f0'].astype('int32'),'fiberID': arr['f1'].astype('int32'), 
-            'centroidx': arr['f2'].astype('float'), 'centroidy':arr['f3'].astype('float')}
-
-
-        df=pd.DataFrame(data=d)
-       
+        df=pd.DataFrame(data=arr)
+        
         return df
 
     def readTelescopeInform(self, frameId):
