@@ -100,8 +100,9 @@ class NajaVenator(object):
         arr = np.genfromtxt(buf, dtype=['i4','i4','f4','f4'],
                     delimiter=',',usecols=(0,1,2,3))
 
-        d = {"mcsId": arr[:,0].astype('int32'),'fiberID': arr[:,1].astype('int32'), 
-            'centroidx': arr[:,2].astype('float'), 'centroidy':arr[:,3].astype('float')}
+        d = {"mcsId": arr['f0'].astype('int32'),'fiberID': arr['f1'].astype('int32'), 
+            'centroidx': arr['f2'].astype('float'), 'centroidy':arr['f3'].astype('float')}
+
 
         df=pd.DataFrame(data=d)
        
