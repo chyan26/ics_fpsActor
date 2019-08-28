@@ -140,29 +140,42 @@ class FpsCmd(object):
         Do nearest neighbour matching on a set of centroids (ie, home position case).
 
         """
-
+        dist_thres = 5.0
         orix=[]
         oriy=[]
         px = []
         py = []
+        cx = []
+        cy = []
         fiberid = []
+        mcsid = []
+        
         for index, row in baseData.iterrows():
             dist=np.sqrt((row['x']-poolData['pfix'])**2 + (row['y']-poolData['pfiy'])**2)
             ind=pd.Series.idxmin(dist)
-
+            
+            fiberid.append(row['fiberID'])
             orix.append(row['x'])
             oriy.append(row['y'])
-            fiberid.append(row['fiberID'])
-            if(min(dist) < 10):
+            if(min(dist) < dist_thres):
                 px.append(poolData['pfix'][ind])
                 py.append(poolData['pfiy'][ind])
+                cx.append(poolData['centroidx'][ind])
+                cy.append(poolData['centroidy'][ind])
+                mcsid.append(poolData['mcsId'][ind])
                 #otherwise set values to NaN
             else:
                 px.append(np.nan)
                 py.append(np.nan)
-            
-        d = {'fiberID': fiberid, 'orix': orix, 'oriy': oriy, 'pfix': px, 'pfiy': py}
+                cx.append(np.nan)
+                cy.append(np.nan)
+                mcsid.append(np.nan)
+        d = {'fiberId': np.array(fiberid).astype('int32'), 'mcsId': np.array(mcsid).astype('int32'), 
+            'orix': np.array(orix).astype('float'), 'oriy': np.array(oriy).astype('float'), 
+            'pfix': np.array(px).astype('float'), 'pfiy': np.array(py).astype('float'), 
+                'centroidx': np.array(cx).astype('float'), 'centroidy': np.array(cy).astype('float')}
         match = pd.DataFrame(data=d)
+        
 
         return match
 
@@ -197,10 +210,15 @@ class FpsCmd(object):
         #call the routine
         xyout=CoordTransp.CoordinateTransform(xyin,za,'mcs_pfi',inr=inr,cent=rotCent)
 
-        d = {'ffID': np.arange(len(xyout[0])), 'pfix': xyout[0], 'pfiy': xyout[1]}
-        transPos=pd.DataFrame(data=d) 
-        
-        match = self._findHomes(ffData, transPos)
+        mcsData['pfix'] = xyout[0]
+        mcsData['pfiy'] = xyout[1]
+
+
+        #d = {'ffID': np.arange(len(xyout[0])), 'pfix': xyout[0], 'pfiy': xyout[1]}
+        #transPos=pd.DataFrame(data=d) 
+
+        match = self._findHomes(ffData, mcsData)
+
         
         pts1=np.zeros((1,len(match['orix']),2))
         pts2=np.zeros((1,len(match['orix']),2))
@@ -232,6 +250,7 @@ class FpsCmd(object):
         moveId = 1
 
         offset=[0,-85]
+        rotCent=[[4471],[2873]]
 
         telInform = self.nv.readTelescopeInform(frameId)
         za = 90-telInform['azi']
@@ -240,41 +259,38 @@ class FpsCmd(object):
         if(inr < 0):
             inr=inr+360
 
-        mcsData = nv.readCentroid(frameId, moveId)
-        sfData = nv.readCobraConfig()
+        mcsData = self.nv.readCentroid(frameId, moveId)
+        sfData = self.nv.readCobraConfig()
 
         sfData['x']-=offset[0]
         sfData['y']-=offset[1]
 
         
-
-
         #correect input format
         xyin=np.array([mcsData['centroidx'],mcsData['centroidy']])
 
         #call the routine
         xyout=CoordTransp.CoordinateTransform(xyin,za,'mcs_pfi',inr=inr,cent=rotCent)
 
-        d = {'ffID': np.arange(len(xyout[0])), 'pfix': xyout[0], 'pfiy': xyout[1]}
-        transPos=pd.DataFrame(data=d) 
+        mcsData['pfix'] = xyout[0]
+        mcsData['pfiy'] = xyout[1]
 
-        pts2=np.zeros((1,len(transPos['pfix']),2))
+        pts2=np.zeros((1,len(xyout[1]),2))
 
-        pts2[0,:,0]=transPos['pfix']
-        pts2[0,:,1]=transPos['pfiy']
+        pts2[0,:,0]=xyout[0]
+        pts2[0,:,1]=xyout[1]
 
 
         afCor=cv2.transform(pts2,self.tranMatrix['affineCoeff'])
-        #xx=afCor[0,:,0]
-        #yy=afCor[0,:,1]
 
-        d = {'ffID': np.arange(len(afCor[0,:,0])), 'mcsx': afCor[0,:,0], 'mcsy': afCor[0,:,1]}
-        mcs=pd.DataFrame(data=d) 
-        match = self._findHomes(sfData, mcs)
+        mcsData['pfix'] = afCor[0,:,0]
+        mcsData['pfiy'] = afCor[0,:,1]
+
+        match = self._findHomes(sfData, mcsData)
 
         match['dx'] = match['orix'] - match['pfix']
         match['dy'] = match['oriy'] - match['pfiy']
-        
+
         return match
 
     def testCamera(self, cmd):
@@ -323,64 +339,13 @@ class FpsCmd(object):
             cmd.inform('text="Exposure finished." ')
 
             if (i == 0):
-                cmd.inform('text="Apply distrotion correction and getting Affine coefficients." ')
+                cmd.inform('text="Getting Affine coefficients from fiducial fibers." ')
                 self.getAEfromFF(cmd, frameId)
+            
+            cmd.inform('text="Apply Affine coefficients to science fibers." ')
+            match = self.applyAEonCobra(cmd, frameId)
+            self.nv.writeCobraConfig(match,frameId)
 
-        # Can look up frameId == visit in mcsData....
 
-        cmd.finish()
-
-#            rawCentroids = self.actor.models['mcs'].keyVarDict['centroidsChunk'][0]
-#         expTime = cmd.cmd.keywords["expTime"].values[0] \
-#           if "expTime" in cmd.cmd.keywords \
-#           else 0.0
-# 
-# 
-#         times = numpy.zeros((cnt, 4), dtype='f8')
-#         
-#         targetPos = self.targetPositions("some field ID")
-#         for i in range(cnt):
-#             times[i,0] = time.time()
-# 
-#             # Fetch measured centroid from the camera actor
-#             cmdString = "centroid expTime=%0.1f" % (expTime)
-#             cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
-#                                           forUserCmd=cmd, timeLim=expTime+5.0)
-#             if cmdVar.didFail:
-#                 cmd.fail('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
-#             #    return
-#             # Encoding will be encapsulated.
-#             rawCentroids = self.actor.models['mcs'].keyVarDict['centroidsChunk'][0]
-#             centroids = numpy.fromstring(base64.b64decode(rawCentroids), dtype='f4').reshape(2400,2)
-#             times[i,1] = time.time()
-# 
-#             # Command the actuators to move.
-#             cmdString = 'moveTo chunk=%s' % (base64.b64encode(targetPos.tostring()))
-#             cmdVar = self.actor.cmdr.call(actor='mps', cmdStr=cmdString,
-#                                           forUserCmd=cmd, timeLim=5.0)
-#             if cmdVar.didFail:
-#                 cmd.fail('text=%s' % (qstr('Failed to move with %s' % (cmdString))))
-#                 return
-#             times[i,2] = time.time()
-# 
-#             cmdVar = self.actor.cmdr.call(actor='mps', cmdStr="ping",
-#                                           forUserCmd=cmd, timeLim=5.0)
-#             if cmdVar.didFail:
-#                 cmd.fail('text=%s' % (qstr('Failed to ping')))
-#                 return
-#             times[i,3] = time.time()
-# 
-#         for i, itimes in enumerate(times):
-#             cmd.inform('text="dt[%d]=%0.4f, %0.4f, %0.4f"' % (i+1, 
-#                                                               itimes[1]-itimes[0],
-#                                                               itimes[2]-itimes[1],
-#                                                               itimes[3]-itimes[2],
-#                                                               ))
-#         cmd.inform('text="dt[mean]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).sum()/cnt,
-#                                                             (times[:,2]-times[:,1]).sum()/cnt,
-#                                                             (times[:,3]-times[:,2]).sum()/cnt))
-#         cmd.inform('text="dt[max]=%0.4f, %0.4f, %0.4f"' % ((times[:,1]-times[:,0]).max(),
-#                                                            (times[:,2]-times[:,1]).max(),
-#                                                            (times[:,3]-times[:,2]).max()))
         cmd.finish("text='Testing loop finished.'")
 
