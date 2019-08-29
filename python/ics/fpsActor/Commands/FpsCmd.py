@@ -327,13 +327,14 @@ class FpsCmd(object):
         xCorner=np.array(xCorner)
         yCorner=np.array(yCorner)
 
-        #fig,ax=plt.subplots()
-        #ax.plot(xCorner,yCorner,'dg')
-
         coords=[xCorner,yCorner]
         xc,yc,r,_= fpstool.least_squares_circle(xCorner,yCorner)
     
-        cmd.finish(f'mcsBoresight={x:0.4f},{y:0.4f}')
+        data = {'visitid':startFrame, 'xc':xc, 'yc': yc}
+        
+        self.nv.writeBoresightTable(data)
+        
+        cmd.finish(f'mcsBoresight={xc:0.4f},{yc:0.4f}')
 
 
     def testCamera(self, cmd):

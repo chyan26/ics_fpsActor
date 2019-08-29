@@ -4,7 +4,8 @@ import os
 import numpy as np
 import pandas as pd
 import psycopg2
-
+import time
+import datetime
 
 class NajaVenator(object):
     """ 
@@ -123,6 +124,20 @@ class NajaVenator(object):
         d = {'frameId': arr[1], 'alt': arr[4], 'azi': arr[5], 'instrot':arr[6]}
 
         return d
+
+    def writeBoresightTable(self, data):
+        conn = self.conn 
+
+        now = datetime.datetime.now()
+        now.strftime("%Y-%m-%d %H:%M:%S")
+
+        cmd = f""" INSERT INTO mcsboresight (visitid, datatime, x, y) \
+        VALUES ({data['visitid']}, '{now.strftime("%Y-%m-%d %H:%M:%S")}',\
+        {data['xc']}, {data['yc']}) """
+
+        with conn:
+            with conn.cursor() as curs:
+                curs.execute(cmd)
 
     def writeCobraConfig(self,matchCatalog,frameid):
         conn = self.conn 
