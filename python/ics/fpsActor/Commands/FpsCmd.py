@@ -16,6 +16,10 @@ from opscore.utility.qstr import qstr
 
 from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
+import mcsActor.Visualization.mcsRoutines as mcs
+import mcsActor.Visualization.fpsRoutines as fps
+
+
 
 class FpsCmd(object):
     def __init__(self, actor):
@@ -35,7 +39,7 @@ class FpsCmd(object):
             ('status', '', self.status),
             ('loadDesign', '<id>', self.loadDesign),
             ('moveToDesign', '', self.moveToDesign),
-            ('getAEfromFF', '', self.getAEfromFF),
+            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
             ('testLoop', '[<cnt>] [<expTime>] [<visit>]', self.testLoop),
         ]
@@ -43,6 +47,10 @@ class FpsCmd(object):
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
+                                        keys.Key("startFrame", types.Int(), help="starting frame for "
+                                                        "boresight calculating"),
+                                       keys.Key("endFrame", types.Int(), help="ending frame for "
+                                                        "boresight calculating"),
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("id", types.Long(),
                                                  help=("fpsDesignId for the field, "
@@ -292,6 +300,40 @@ class FpsCmd(object):
         match['dy'] = match['oriy'] - match['pfiy']
 
         return match
+
+    def calculateBoresight(self, cmd):
+        """ Function for calculating the rotation center """
+        cmdKeys = cmd.cmd.keywords
+
+        startFrame = cmdKeys["startFrame"].values[0] 
+        endFrame = cmdKeys["endFrame"].values[0]
+
+        nframes=  endFrame - startFrame +1
+        frameid = (np.arange(nframes)+startFrame)
+
+        xCorner=[]
+        yCorner=[]
+
+        for i in frameid:
+            mcsData = self.nv.readCentroid(i, 1)
+            x=mcsData['centroidx']
+            y=mcsData['centroidy']  
+            
+            x0,x1,y0,y1=mcs.getCorners(x,y)
+            xCorner.append(x0)
+            yCorner.append(y0)
+
+        xCorner=np.array(xCorner)
+        yCorner=np.array(yCorner)
+
+        #fig,ax=plt.subplots()
+        #ax.plot(xCorner,yCorner,'dg')
+
+        coords=[xCorner,yCorner]
+        xc,yc,r,_= fps.least_squares_circle(xCorner,yCorner)
+    
+        cmd.finish(f'mcsBoresight={x:0.4f},{y:0.4f}')
+
 
     def testCamera(self, cmd):
         """ Camera Loop Test. """

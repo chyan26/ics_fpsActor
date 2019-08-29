@@ -120,7 +120,6 @@ class NajaVenator(object):
 
         arr = np.genfromtxt(buf, dtype='f4',
                             delimiter=',',usecols=range(7))
-        #print(arr.shape)
         d = {'frameId': arr[1], 'alt': arr[4], 'azi': arr[5], 'instrot':arr[6]}
 
         return d
@@ -149,11 +148,7 @@ class NajaVenator(object):
             with conn.cursor() as curs:
                 curs.copy_from(buf,'"CobraConfig"',',',
                         columns=colname)
-
         buf.seek(0,0)
-
-        
-        #cmd.inform('text="Cobra config for frame %s populated."' % (frameid))
 
         return buf
     
