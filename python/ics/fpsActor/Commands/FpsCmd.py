@@ -16,8 +16,9 @@ from opscore.utility.qstr import qstr
 
 from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
-import mcsActor.Visualization.mcsRoutines as mcs
-import mcsActor.Visualization.fpsRoutines as fps
+from ics.fpsActor import fpsFunction as fpstool
+#import mcsActor.Visualization.mcsRoutines as mcs
+#import mcsActor.Visualization.fpsRoutines as fps
 
 
 
@@ -319,7 +320,7 @@ class FpsCmd(object):
             x=mcsData['centroidx']
             y=mcsData['centroidy']  
             
-            x0,x1,y0,y1=mcs.getCorners(x,y)
+            x0,x1,y0,y1=fpstool.getCorners(x,y)
             xCorner.append(x0)
             yCorner.append(y0)
 
@@ -330,7 +331,7 @@ class FpsCmd(object):
         #ax.plot(xCorner,yCorner,'dg')
 
         coords=[xCorner,yCorner]
-        xc,yc,r,_= fps.least_squares_circle(xCorner,yCorner)
+        xc,yc,r,_= fpstool.least_squares_circle(xCorner,yCorner)
     
         cmd.finish(f'mcsBoresight={x:0.4f},{y:0.4f}')
 
