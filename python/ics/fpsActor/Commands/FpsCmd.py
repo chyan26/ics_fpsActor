@@ -9,6 +9,8 @@ import cv2
 from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
 
+import logging
+
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
@@ -19,6 +21,13 @@ from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
 #import mcsActor.Visualization.mcsRoutines as mcs
 #import mcsActor.Visualization.fpsRoutines as fps
+
+from ics.cobraCharmer.procedures.moduleTest import calculation
+from ics.cobraCharmer import pfi as pfiControl
+from ics.cobraCharmer import pfiDesign
+from ics.cobraCharmer.utils import butler
+from ics.cobraCharmer.fpgaState import fpgaState
+from ics.cobraCharmer import cobraState
 
 
 
@@ -40,6 +49,7 @@ class FpsCmd(object):
             ('status', '', self.status),
             ('loadDesign', '<id>', self.loadDesign),
             ('moveToDesign', '', self.moveToDesign),
+            ('makeMotorMap','[<arm>] [<stepsize>]',self.makMotorMap)
             ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
             ('testLoop', '[<cnt>] [<expTime>] [<visit>]', self.testLoop),
@@ -48,9 +58,10 @@ class FpsCmd(object):
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
+                                        keys.Key("arm", types.String(), help="corbra arm"),
                                         keys.Key("startFrame", types.Int(), help="starting frame for "
                                                         "boresight calculating"),
-                                       keys.Key("endFrame", types.Int(), help="ending frame for "
+                                        keys.Key("endFrame", types.Int(), help="ending frame for "
                                                         "boresight calculating"),
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("id", types.Long(),
@@ -59,6 +70,101 @@ class FpsCmd(object):
                                         keys.Key("expTime", types.Float(), 
                                                  help="Seconds for exposure"))
 
+        self.logger = logging.getLogger('fps')
+        self.logger.setLevel(logging.INFO)
+
+        """ Init module 1 cobras """
+
+        # NO, not 1!! Pass in moduleName, etc. -- CPL
+        reload(pfiControl)
+        self.allCobras = np.array(pfiControl.PFI.allocateCobraModule(1))
+        self.fpgaHost = fpgaHost
+        self.xml = xml
+        self.brokens = brokens
+        #self.camSplit = camSplit
+
+        # partition module 1 cobras into odd and even sets
+        moduleCobras = {}
+        for group in 1, 2:
+            cm = range(group, 58, 2)
+            mod = [1]*len(cm)
+            moduleCobras[group] = pfiControl.PFI.allocateCobraList(zip(mod, cm))
+        self.oddCobras = moduleCobras[1]
+        self.evenCobras = moduleCobras[2]
+
+        self.pfi = None
+
+        self.thetaCenter = None
+        self.thetaCCWHome = None
+        self.thetaCWHome = None
+        self.phiCenter = None
+        self.phiCCWHome = None
+        self.phiCWHome = None
+
+        self.setBrokenCobras(self.brokens)
+
+    def _connect(self):
+        # Initializing COBRA module
+        self.pfi = pfiControl.PFI(fpgaHost=self.fpgaHost,
+                                  doLoadModel=False,
+                                  logDir=self.runManager.logDir)
+        self.pfi.loadModel(self.xml)
+        self.pfi.setFreq()
+
+        # initialize cameras
+        #self.cam = camera.cameraFactory(name='rmod',doClear=True, runManager=self.runManager)
+
+        # init calculation library
+        self.cal = calculation.Calculation(self.xml, None, None)
+
+        # define the broken/good cobras
+        self.setBrokenCobras(self.brokens)
+
+    def setBrokenCobras(self, brokens=None):
+        """ define the broken/good cobras """
+        if brokens is None:
+            brokens = []
+        visibles = [e for e in range(1, 58) if e not in brokens]
+        self.badIdx = np.array(brokens) - 1
+        self.goodIdx = np.array(visibles) - 1
+        self.badCobras = np.array(self.getCobras(self.badIdx))
+        self.goodCobras = np.array(self.getCobras(self.goodIdx))
+
+        if hasattr(self, 'cal'):
+            self.cal.setBrokenCobras(brokens)
+
+    def exposeAndExtractPositions(self, name=None, guess=None, tolerance=None):
+        """ Take an exposure, measure centroids, match to cobras, save info.
+
+        Args
+        ----
+        name : `str`
+           Additional name for saved image file. File _always_ gets PFS-compliant name.
+        guess : `ndarray` of complex coordinates
+           Where to center searches. By default uses the cobra center.
+        tolerance : `float`
+           Additional factor to scale search region by. 1 = cobra radius (phi+theta)
+
+        Returns
+        -------
+        positions : `ndarray` of complex
+           The measured positions of our cobras.
+           If no matching spot found, return the cobra center.
+
+        Note
+        ----
+        Not at all convinced that we should return anything if no matching spot found.
+
+        """
+        cmd.inform(f'text="executing exposeAndExtractPositions"')
+
+        frameId = self._mcsExpose(cmd, frameId, expTime=expTime, doCentroid=True)
+        
+        centroids, filename, bkgd = self.cam.expose(name)
+        positions, indexMap = self.cal.matchPositions(centroids, guess=guess, tolerance=tolerance)
+        self._saveMoveTable(filename.stem, positions, indexMap)
+
+        return positions        
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
 
@@ -97,6 +203,190 @@ class FpsCmd(object):
 
         fpsState.fpsState.setDesign(designId, design)
         cmd.finish(f'pfsDesignId={designId:#016x}')
+
+    def makeMotorMap(self,cmd,arm):
+        """ Making motor map. """
+
+        cmd.finish(f'Motor map sequence finished')
+
+
+    def _makePhiMotorMap(self, cmd, newXml, repeat=3, steps=100,
+            totalSteps=5000, fast=False, phiOnTime=None, updateGeometry=False,
+            limitOnTime=0.08, resetScaling=True, delta=np.deg2rad(5.0), fromHome=False
+        ):
+        """ generate phi motor maps, it accepts custom phiOnTIme parameter.
+            it assumes that theta arms have been move to up/down positions to avoid collision
+            if phiOnTime is not None, fast parameter is ignored. Otherwise use fast/slow ontime
+
+            Example:
+                makePhiMotorMap(xml, path, fast=True)             // update fast motor maps
+                makePhiMotorMap(xml, path, fast=False)            // update slow motor maps
+                makePhiMotorMap(xml, path, phiOnTime=0.06)        // motor maps for on-time=0.06
+        """
+        self._connect()
+        defaultOnTimeFast = deepcopy([self.pfi.calibModel.motorOntimeFwd2,
+                                      self.pfi.calibModel.motorOntimeRev2])
+        defaultOnTimeSlow = deepcopy([self.pfi.calibModel.motorOntimeSlowFwd2,
+                                      self.pfi.calibModel.motorOntimeSlowRev2])
+
+        # set fast on-time to a large value so it can move over whole range, set slow on-time to the test value.
+        fastOnTime = [np.full(57, limitOnTime)] * 2
+        if phiOnTime is not None:
+            if np.isscalar(phiOnTime):
+                slowOnTime = [np.full(57, phiOnTime)] * 2
+            else:
+                slowOnTime = phiOnTime
+        elif fast:
+            slowOnTime = defaultOnTimeFast
+        else:
+            slowOnTime = defaultOnTimeSlow
+
+        # update ontimes for test
+        self.pfi.calibModel.updateOntimes(phiFwd=fastOnTime[0], phiRev=fastOnTime[1], fast=True)
+        self.pfi.calibModel.updateOntimes(phiFwd=slowOnTime[0], phiRev=slowOnTime[1], fast=False)
+
+        # variable declaration for position measurement
+        iteration = totalSteps // steps
+        phiFW = np.zeros((57, repeat, iteration+1), dtype=complex)
+        phiRV = np.zeros((57, repeat, iteration+1), dtype=complex)
+
+        if resetScaling:
+            self.pfi.resetMotorScaling(cobras=None, motor='phi')
+
+        # record the phi movements
+        dataPath = self.runManager.dataDir
+        self.logger.info(f'phi home {-totalSteps} steps')
+        self.pfi.moveAllSteps(self.goodCobras, 0, -totalSteps)  # default is fast
+        for n in range(repeat):
+            self.cam.resetStack(f'phiForwardStack{n}.fits')
+
+            # forward phi motor maps
+            phiFW[self.goodIdx, n, 0] = self.exposeAndExtractPositions(f'phiBegin{n}.fits')
+
+            notdoneMask = np.zeros(len(phiFW), 'bool')
+            notdoneMask[self.goodIdx] = True
+            for k in range(iteration):
+                self.logger.info(f'{n+1}/{repeat} phi forward to {(k+1)*steps}')
+                if fromHome:
+                    self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, (k+1)*steps, phiFast=False)
+                else:
+                    self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, steps, phiFast=False)
+                phiFW[self.goodIdx, n, k+1] = self.exposeAndExtractPositions(f'phiForward{n}N{k}.fits',
+                                                                             guess=phiFW[self.goodIdx, n, k])
+                if fromHome:
+                    self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, -(k+1)*steps)
+
+                doneMask, lastAngles = self.phiFWDone(phiFW, n, k)
+                if doneMask is not None:
+                    newlyDone = doneMask & notdoneMask
+                    if np.any(newlyDone):
+                        notdoneMask &= ~doneMask
+                        self.logger.info(f'done: {np.where(newlyDone)[0]}, {(notdoneMask == True).sum()} left')
+                if not np.any(notdoneMask):
+                    phiFW[self.goodIdx, n, k+2:] = phiFW[self.goodIdx, n, k+1][:,None]
+                    break
+            if doneMask is not None and np.any(notdoneMask):
+                self.logger.warn(f'{(notdoneMask == True).sum()} cobras did not finish:')
+                for c_i in np.where(notdoneMask)[0]:
+                    c = self.allCobras[c_i]
+                    d = np.rad2deg(lastAngles[c_i])
+                    self.logger.warn(f'  {str(c)}: {np.round(d, 2)}')
+
+            # make sure it goes to the limit
+            self.logger.info(f'{n+1}/{repeat} phi forward {totalSteps} to limit')
+            self.pfi.moveAllSteps(self.goodCobras, 0, totalSteps)  # fast to limit
+
+            # reverse phi motor maps
+            self.cam.resetStack(f'phiReverseStack{n}.fits')
+            phiRV[self.goodIdx, n, 0] = self.exposeAndExtractPositions(f'phiEnd{n}.fits',
+                                                                       guess=phiFW[self.goodIdx, n, iteration])
+            notdoneMask = np.zeros(len(phiRV), 'bool')
+            notdoneMask[self.goodIdx] = True
+            for k in range(iteration):
+                self.logger.info(f'{n+1}/{repeat} phi backward to {(k+1)*steps}')
+                if fromHome:
+                    self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, -(k+1)*steps, phiFast=False)
+                else:
+                    self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, -steps, phiFast=False)
+                phiRV[self.goodIdx, n, k+1] = self.exposeAndExtractPositions(f'phiReverse{n}N{k}.fits',
+                                                                             guess=phiRV[self.goodIdx, n, k])
+                if fromHome:
+                    self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, (k+1)*steps)
+                doneMask, lastAngles = self.phiRVDone(phiRV, n, k)
+                if doneMask is not None:
+                    newlyDone = doneMask & notdoneMask
+                    if np.any(newlyDone):
+                        notdoneMask &= ~doneMask
+                        self.logger.info(f'done: {np.where(newlyDone)[0]}, {(notdoneMask == True).sum()} left')
+                if not np.any(notdoneMask):
+                    phiRV[self.goodIdx, n, k+2:] = phiRV[self.goodIdx, n, k+1][:,None]
+                    break
+
+            if doneMask is not None and np.any(notdoneMask):
+                self.logger.warn(f'{(notdoneMask == True).sum()} did not finish:')
+                for c_i in np.where(notdoneMask)[0]:
+                    c = self.allCobras[c_i]
+                    d = np.rad2deg(lastAngles[c_i])
+                    self.logger.warn(f'  {str(c)}: {np.round(d, 2)}')
+
+            # At the end, make sure the cobra back to the hard stop
+            self.logger.info(f'{n+1}/{repeat} phi reverse {-totalSteps} steps to limit')
+            self.pfi.moveAllSteps(self.goodCobras, 0, -totalSteps)  # fast to limit
+        self.cam.resetStack()
+
+        # save calculation result
+        np.save(dataPath / 'phiFW', phiFW)
+        np.save(dataPath / 'phiRV', phiRV)
+
+        # calculate centers and phi angles
+        phiCenter, phiRadius, phiAngFW, phiAngRV, badRange = self.cal.phiCenterAngles(phiFW, phiRV)
+        np.save(dataPath / 'phiCenter', phiCenter)
+        np.save(dataPath / 'phiRadius', phiRadius)
+        np.save(dataPath / 'phiAngFW', phiAngFW)
+        np.save(dataPath / 'phiAngRV', phiAngRV)
+        np.save(dataPath / 'badRange', badRange)
+
+        # calculate average speeds
+        phiSpeedFW, phiSpeedRV = self.cal.speed(phiAngFW, phiAngRV, steps, delta)
+        np.save(dataPath / 'phiSpeedFW', phiSpeedFW)
+        np.save(dataPath / 'phiSpeedRV', phiSpeedRV)
+
+        # calculate motor maps by Johannes weighting
+        if fromHome:
+            phiMMFW, phiMMRV, bad = self.cal.motorMaps2(phiAngFW, phiAngRV, steps, delta)
+        else:
+            phiMMFW, phiMMRV, bad = self.cal.motorMaps(phiAngFW, phiAngRV, steps, delta)
+        bad[badRange] = True
+        np.save(dataPath / 'phiMMFW', phiMMFW)
+        np.save(dataPath / 'phiMMRV', phiMMRV)
+        np.save(dataPath / 'bad', np.where(bad)[0])
+
+        # calculate motor maps by average speeds
+        #phiMMFW2, phiMMRV2, bad2 = self.cal.motorMaps2(phiAngFW, phiAngRV, steps, delta)
+        #bad2[badRange] = True
+        #np.save(dataPath / 'phiMMFW2', phiMMFW2)
+        #np.save(dataPath / 'phiMMRV2', phiMMRV2)
+        #np.save(dataPath / 'bad2', np.where(bad2)[0])
+
+        # update XML file, using Johannes weighting
+        slow = not fast
+        self.cal.updatePhiMotorMaps(phiMMFW, phiMMRV, bad, slow)
+        if phiOnTime is not None:
+            if np.isscalar(phiOnTime):
+                onTime = np.full(57, phiOnTime)
+                self.cal.calibModel.updateOntimes(phiFwd=onTime, phiRev=onTime, fast=fast)
+            else:
+                self.cal.calibModel.updateOntimes(phiFwd=phiOnTime[0], phiRev=phiOnTime[1], fast=fast)
+        if updateGeometry:
+            self.cal.calibModel.updateGeometry(centers=phiCenter, phiArms=phiRadius)
+        self.cal.calibModel.createCalibrationFile(self.runManager.outputDir / newXml, name='phiModel')
+
+        # restore default setting ( really? why? CPL )
+        # self.cal.restoreConfig()
+        # self.pfi.loadModel(self.xml)
+
+        self.setPhiGeometryFromRun(self.runManager.runDir, onlyIfClear=True)
+        return self.runManager.runDir
 
     def moveToDesign(self,cmd):
         """ Move cobras to the pfsDesign. """
