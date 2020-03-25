@@ -83,14 +83,14 @@ class NajaVenator(object):
 
         return df
 
-    def readCentroid(self, frameId, moveId):
+    def readCentroid(self, frameId):
         """ Read centroid information from databse"""
         conn = self.conn 
 
         buf = io.StringIO()
 
-        cmd = f"""copy (select "mcsId", "fiberId", "centroidx", "centroidy" from "mcsData"
-                where "frameId"={frameId} and "moveId"={moveId}) to stdout delimiter ',' """
+        cmd = f"""copy (select "mcs_frame_id", "spot_id", "mcs_center_x_pix", "mcs_center_y_pix" from "mcs_data"
+                where "mcs_frame_id"={frameId}) to stdout delimiter ',' """
 
         with conn:
             with conn.cursor() as curs:

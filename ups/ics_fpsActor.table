@@ -1,6 +1,7 @@
 setupRequired(tron_actorcore)
 setupRequired(ics_actorkeys)
 setupRequired(ics_mcsActor)
+setupRequired(ics_cobraCharmer)
 
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
