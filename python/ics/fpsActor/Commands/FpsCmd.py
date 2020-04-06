@@ -138,6 +138,7 @@ class FpsCmd(object):
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),            
             ('moveToDesign', '', self.moveToDesign),
             ('gotoSafeFromPhi60','',self.gotoSafeFromPhi60),
+            ('gotoVerticalFromPhi60','',self.gotoVerticalFromPhi60),
             ('makeMotorMap','@(phi|theta) <stepsize> <repeat> [@slowOnly]',self.makeMotorMap),
             ('angleConverge','@(phi|theta) <angleTargets>',self.angleConverge),
             ('motorOntimeSearch','@(phi|theta)',self.motorOntimeSearch),
@@ -1487,11 +1488,13 @@ class FpsCmd(object):
         """ Making comvergence test for a specific arm. """
         cmdKeys = cmd.cmd.keywords
         angle = cmd.cmd.keywords['angle'].values[0]
-
-        datapath = self._moveToPhiAngle(cmd, angle=60.0, keepExistingPosition=False)
+        
+        self.logger.info(f'Move phi to angle = {angle}')
+            
+        datapath = self._moveToPhiAngle(cmd, angle=angle, keepExistingPosition=False)
 
         self.logger.info(f'Data path : {datapath}')    
-        cmd.finish(f'PHI is now at 60 degress!!')
+        cmd.finish(f'PHI is now at {angle} degress!!')
         
     def _getIndexInGoodCobras(self, idx=None):
         # map an index for all cobras to an index for only the visible cobras
@@ -1910,6 +1913,28 @@ class FpsCmd(object):
                                     keepExistingPosition=keepExisting, globalAngles=True)
         
         cmd.finish(f'gotoSafeFromPhi60 is finished')
+
+    def gotoVerticalFromPhi60(self, cmd):
+        """ Move cobras to nominal safe position: thetas OUT, phis in.
+        Assumes phi is at 60deg and that we know thetaPositions.
+
+        """
+        phiAngle=60.0
+        tolerance=np.rad2deg(0.05)
+        angle = (180.0 - phiAngle) / 2.0
+        thetaAngles = np.full(len(self.allCobras), -angle, dtype='f4')
+        thetaAngles[np.arange(0,57,2)] += 90
+        thetaAngles[np.arange(1,57,2)] += 270
+
+        if not hasattr(self, 'thetaHomes'):
+            keepExisting = False
+        else:
+            keepExisting = True
+
+        run = self._moveToThetaAngle(cmd, None, angle=thetaAngles, tolerance=tolerance,
+                                    keepExistingPosition=keepExisting, globalAngles=True)
+        
+        cmd.finish(f'gotoVerticalFromPhi60 is finished')
 
     def motorOntimeSearch(self, cmd):
         """ FPS interface of searching the on time parameters for a specified motor speed """
