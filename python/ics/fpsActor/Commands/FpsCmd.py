@@ -31,6 +31,7 @@ from ics.fpsActor.utils import butler
 #import mcsActor.Visualization.fpsRoutines as fps
 
 from procedures.moduleTest import calculation
+reload(calculation)
 from procedures.moduleTest.speedModel import SpeedModel
 
 from ics.cobraCharmer import pfi as pfiControl
@@ -114,7 +115,7 @@ def unwrappedPosition(pos, center, homeAngle, fromAngle, toAngle,
 
 fpgaHost = '128.149.77.24'
 #xml = pathlib.Path('/home/pfs/mhs/devel/pfs_instdata/data/pfi/modules/SC01/SC01_pfi.xml')
-brokens = []
+
 class FpsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -176,22 +177,22 @@ class FpsCmd(object):
 
         # NO, not 1!! Pass in moduleName, etc. -- CPL
         reload(pfiControl)
-        self.allCobras = np.array(pfiControl.PFI.allocateCobraModule(1))
-        self.nCobras = len(self.allCobras)
+        #self.allCobras = np.array(pfiControl.PFI.allocateCobraModule(1))
+        #self.nCobras = len(self.allCobras)
 
         self.fpgaHost = fpgaHost
         self.xml = None
-        self.brokens = brokens
+        self.brokens = [139,172,194,226,322,399,470]
         #self.camSplit = camSplit
 
         # partition module 1 cobras into odd and even sets
-        moduleCobras = {}
-        for group in 1, 2:
-            cm = range(group, 58, 2)
-            mod = [1]*len(cm)
-            moduleCobras[group] = pfiControl.PFI.allocateCobraList(zip(mod, cm))
-        self.oddCobras = moduleCobras[1]
-        self.evenCobras = moduleCobras[2]
+        #moduleCobras = {}
+        #for group in 1, 2:
+        #    cm = range(group, 58, 2)
+        #    mod = [1]*len(cm)
+        #    moduleCobras[group] = pfiControl.PFI.allocateCobraList(zip(mod, cm))
+        #self.oddCobras = moduleCobras[1]
+        #self.evenCobras = moduleCobras[2]
 
         self.pfi = None
 
@@ -202,7 +203,7 @@ class FpsCmd(object):
         self.phiCCWHome = None
         self.phiCWHome = None
 
-        self.setBrokenCobras(self.brokens)
+        #self.setBrokenCobras(self.brokens)
 
         self.dataPath = None
 
@@ -218,12 +219,30 @@ class FpsCmd(object):
 
     def _connect(self):
         self.runManager.newRun()
+        reload(pfiControl)
         # Initializing COBRA module
         self.pfi = pfiControl.PFI(fpgaHost=self.fpgaHost,
                                   doLoadModel=False,
                                   logDir=self.runManager.logDir)
-        self.pfi.loadModel(self.xml)
-        self.pfi.setFreq()
+        
+        self.modules = [f'SC{m:02d}' for m in [1,2,3,15,16,17,29,30,31]]
+        self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
+
+        self.pfi.loadModel(self.modFiles)
+        
+        
+        if self.xml is None:
+            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/nineModule.xml'))
+        else:
+            newModel = pfiDesign.PFIDesign(self.xml)
+        
+        self.pfi.calibModel = newModel
+        self.logger.info(f'Loading XML from {self.xml}')
+
+        self.allCobras = np.array(self.pfi.getAllDefinedCobras())
+        self.nCobras = len(self.allCobras)
+
+        self.pfi.setFreq(self.allCobras)
 
         # initialize cameras
         #self.cam = camera.cameraFactory(name='rmod',doClear=True, runManager=self.runManager)
@@ -232,17 +251,35 @@ class FpsCmd(object):
         self.cal = calculation.Calculation(self.pfi.calibModel, None, None)
 
         # define the broken/good cobras
-        self.setBrokenCobras(self.brokens)
+        self.logger.info(f'Setting broken fibers =  {self.brokens}')
+        self.setBrokenCobras(brokens=self.brokens)
 
     def setBrokenCobras(self, brokens=None):
         """ define the broken/good cobras """
         if brokens is None:
             brokens = []
-        visibles = [e for e in range(1, 58) if e not in brokens]
+            brokens=[139,172,194,226,322,399,470]
+        else:
+            brokens = brokens
+        # brokens=[
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(31,13)+1,
+        #     ]
+        
+        
+        visibles = [e for e in range(1, self.nCobras+1) if e not in brokens]
         self.badIdx = np.array(brokens) - 1
         self.goodIdx = np.array(visibles) - 1
-        self.badCobras = np.array(self.getCobras(self.badIdx))
-        self.goodCobras = np.array(self.getCobras(self.goodIdx))
+        #self.badCobras = np.array(self.getCobras(self.badIdx))
+        #self.goodCobras = np.array(self.getCobras(self.goodIdx))
+        if len(self.badIdx) is not 0:
+            self.badCobras = np.array(self.allCobras)[self.badIdx]
+        self.goodCobras = np.array(self.allCobras)[self.goodIdx]
 
         if hasattr(self, 'cal'):
             self.cal.setBrokenCobras(brokens)
@@ -281,17 +318,17 @@ class FpsCmd(object):
         # Now, get centroids
         mcsData = self.nv.readCentroid(frameId)
         self.logger.info(f'mcs data {mcsData.shape[0]}')
-        #print(mcsData['centroidx'])
         centroids = {'x':mcsData['centroidx'].values.astype('float'), 
                      'y':mcsData['centroidy'].values.astype('float')}
         
         #print(visit)
         #centroids, filename, bkgd = self.cam.expose(name)
         positions, indexMap = self.cal.matchPositions(centroids, guess=guess, tolerance=tolerance)
+        
+        self.logger.info(f'Matched positions = {len(positions)}')
         #print(positions)
         #self._saveMoveTable(filename.stem, positions, indexMap)
-        #print(indexMap)
-
+        #positions = np.zeros(len(self.goodIdx))
         self.dataPath = datapath
         return positions, filename
 
@@ -612,8 +649,8 @@ class FpsCmd(object):
             newXml= f'{day}-phi-slow.xml'
             runDir, bad = self._makePhiMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
 
-            self.xml = runDir / 'output' / newXml
-            self.pfi.loadModel(self.xml)
+            self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+            self.pfi.loadModel([self.xml])
             
             if slowOnly is False:
                 self.logger.info(f'Running PHI Fast motor map.')
@@ -630,8 +667,8 @@ class FpsCmd(object):
             newXml= f'{day}-theta-slow.xml'
             runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
 
-            self.xml = runDir / 'output' / newXml
-            self.pfi.loadModel(self.xml)
+            self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+            self.pfi.loadModel([self.xml])
 
             if slowOnly is False:
                 self.logger.info(f'Running THETA FAST motor map.')
@@ -655,7 +692,7 @@ class FpsCmd(object):
             totalSteps=5000,
             fast=False,
             phiOnTime=None,
-            updateGeometry=True,
+            updateGeometry=False,
             limitOnTime=0.08,
             limitSteps=5000,
             resetScaling=True,
@@ -665,12 +702,13 @@ class FpsCmd(object):
         
         totalSteps =  6000
         self._connect()
+        self.logger.info(f'Connect to FPGA without problem.')
 
         defaultOnTimeFast = deepcopy([self.pfi.calibModel.motorOntimeFwd2,
                                     self.pfi.calibModel.motorOntimeRev2])
         defaultOnTimeSlow = deepcopy([self.pfi.calibModel.motorOntimeSlowFwd2,
                                     self.pfi.calibModel.motorOntimeSlowRev2])
-
+       
         # set fast on-time to a large value so it can move over whole range, set slow on-time to the test value.
         # set fast on-time to a large value so it can move over whole range, set slow on-time to the test value.
         fastOnTime = [np.full(self.nCobras, limitOnTime)] * 2
@@ -693,9 +731,10 @@ class FpsCmd(object):
 
         # variable declaration for position measurement
         iteration = totalSteps // steps
-        phiFW = np.zeros((57, repeat, iteration+1), dtype=complex)
-        phiRV = np.zeros((57, repeat, iteration+1), dtype=complex)
-
+        phiFW = np.zeros((self.nCobras, repeat, iteration+1), dtype=complex)
+        phiRV = np.zeros((self.nCobras, repeat, iteration+1), dtype=complex)
+        
+        self.logger.info(f'number of good cobra = {len(self.goodIdx)}')
         if resetScaling:
             self.pfi.resetMotorScaling(cobras=None, motor='phi')
 
@@ -704,7 +743,6 @@ class FpsCmd(object):
         self.pfi.moveAllSteps(self.goodCobras, 0, -totalSteps)
 
         
-
         for n in range(repeat):
             fwlist = []
             rvlist = []
@@ -714,10 +752,10 @@ class FpsCmd(object):
             notdoneMask = np.zeros(len(phiFW), 'bool')
             notdoneMask[self.goodIdx] = True
             fwlist.append(filename)
-
+            
             for k in range(iteration):
                 self.logger.info(f'{n+1}/{repeat} phi forward to {(k+1)*steps}')
-                self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, steps, phiFast=False)
+                self.pfi.moveAllSteps(self.allCobras[np.where(notdoneMask)], 0, steps, phiFast=False)
                 phiFW[self.goodIdx, n, k+1], filename = self.exposeAndExtractPositions(cmd,
                                                         guess=phiFW[self.goodIdx, n, k])
 
@@ -753,7 +791,7 @@ class FpsCmd(object):
             notdoneMask[self.goodIdx] = True
             for k in range(iteration):
                 self.logger.info(f'{n+1}/{repeat} phi backward to {-totalSteps+(k+1)*steps}')
-                self.pfi.moveAllSteps(self.allCobras[notdoneMask], 0, -steps, phiFast=False)
+                self.pfi.moveAllSteps(self.allCobras[np.where(notdoneMask)], 0, -steps, phiFast=False)
                 phiRV[self.goodIdx, n, k+1], filename = self.exposeAndExtractPositions(cmd,
                                                 guess=phiRV[self.goodIdx, n, k])
 
@@ -835,7 +873,7 @@ class FpsCmd(object):
             else:
                 self.logger.info(f'Updating on-time {phiOnTime}.')
                 self.cal.calibModel.updateOntimes(phiFwd=phiOnTime[0], phiRev=phiOnTime[1], fast=fast)
-        if updateGeometry:
+        if updateGeometry is True:
             self.cal.calibModel.updateGeometry(centers=phiCenter, phiArms=phiRadius)
         
         
@@ -846,6 +884,7 @@ class FpsCmd(object):
         if len(self.badIdx)>0:
             bad[self.badIdx] = False
         return self.runManager.runDir, np.where(bad)[0]
+
 
     def _measureAngles(self, cmd, centers, homes):
         """ measure positions and angles for good cobras """
@@ -882,6 +921,7 @@ class FpsCmd(object):
                              fromHome=False):
         """ """
         self._connect()
+        self.setBrokenCobras(brokens=[139,172,194,226,322,399,400,470])
         totalSteps = 12000
         defaultOnTimeFast = deepcopy([self.pfi.calibModel.motorOntimeFwd1,
                                       self.pfi.calibModel.motorOntimeRev1])
@@ -889,10 +929,10 @@ class FpsCmd(object):
                                       self.pfi.calibModel.motorOntimeSlowRev1])
 
         # set fast on-time to a large value so it can move over whole range, set slow on-time to the test value.
-        fastOnTime = [np.full(57, limitOnTime)] * 2
+        fastOnTime = [np.full(self.nCobras, limitOnTime)] * 2
         if thetaOnTime is not None:
             if np.isscalar(thetaOnTime):
-                slowOnTime = [np.full(57, thetaOnTime)] * 2
+                slowOnTime = [np.full(self.nCobras, thetaOnTime)] * 2
             else:
                 slowOnTime = thetaOnTime
         elif fast:
@@ -906,8 +946,8 @@ class FpsCmd(object):
 
         # variable declaration for position measurement
         iteration = totalSteps // steps
-        thetaFW = np.zeros((57, repeat, iteration+1), dtype=complex)
-        thetaRV = np.zeros((57, repeat, iteration+1), dtype=complex)
+        thetaFW = np.zeros((self.nCobras, repeat, iteration+1), dtype=complex)
+        thetaRV = np.zeros((self.nCobras, repeat, iteration+1), dtype=complex)
 
         if resetScaling:
             self.pfi.resetMotorScaling(cobras=None, motor='theta')
@@ -1022,6 +1062,8 @@ class FpsCmd(object):
 
         return self.runManager.runDir, thetaFW, thetaRV
 
+
+
     def _reduceThetaMotorMap(self, cmd, newXml, runDir, steps,
                             thetaOnTime=None,
                             delta=None, fast=False,
@@ -1073,7 +1115,7 @@ class FpsCmd(object):
         self.cal.updateThetaMotorMaps(thetaMMFW, thetaMMRV, bad, slow)
         if thetaOnTime is not None:
             if np.isscalar(thetaOnTime):
-                onTime = np.full(57, thetaOnTime)
+                onTime = np.full(self.nCobras, thetaOnTime)
                 self.logger.info(f'Updating theta-ontime: {onTime}')
                 self.pfi.calibModel.updateOntimes(thetaFwd=onTime, thetaRev=onTime, fast=fast)
             else:
@@ -1164,8 +1206,8 @@ class FpsCmd(object):
             # variable declaration for center measurement
             steps = 200
             iteration = 4000 // steps
-            phiFW = np.zeros((57, iteration+1), dtype=complex)
-            phiRV = np.zeros((57, iteration+1), dtype=complex)
+            phiFW = np.zeros((self.nCobras, iteration+1), dtype=complex)
+            phiRV = np.zeros((self.nCobras, iteration+1), dtype=complex)
 
             #record the phi movements
             #self.cam.resetStack('phiForwardStack.fits')
@@ -1200,10 +1242,10 @@ class FpsCmd(object):
             np.save(dataPath / 'phiRV', phiRV)
 
             # variable declaration
-            phiCenter = np.zeros(57, dtype=complex)
-            phiRadius = np.zeros(57, dtype=float)
-            phiCCWHome = np.zeros(57, dtype=float)
-            phiCWHome = np.zeros(57, dtype=float)
+            phiCenter = np.zeros(self.nCobras, dtype=complex)
+            phiRadius = np.zeros(self.nCobras, dtype=float)
+            phiCCWHome = np.zeros(self.nCobras, dtype=float)
+            phiCWHome = np.zeros(self.nCobras, dtype=float)
 
             # measure centers
             for c in self.goodIdx:
@@ -1236,10 +1278,10 @@ class FpsCmd(object):
             homes = self.phiCCWHome[self.goodIdx]
 
         # convergence test
-        phiData = np.zeros((57, runs, tries, 4))
+        phiData = np.zeros((self.nCobras, runs, tries, 4))
         zeros = np.zeros(len(self.goodIdx))
-        notdoneMask = np.zeros(57, 'bool')
-        nowDone = np.zeros(57, 'bool')
+        notdoneMask = np.zeros(self.nCobras, 'bool')
+        nowDone = np.zeros(self.nCobras, 'bool')
         tolerance = np.deg2rad(tolerance)
 
         for i in range(runs):
@@ -1330,6 +1372,8 @@ class FpsCmd(object):
     
     def _thetaConvergenceTest(self, cmd, margin=15.0, runs=50, tries=8, fast=False, tolerance=0.2, scaleFactor=1.0):
         self._connect()
+        self.setBrokenCobras(brokens=[139,172,194,226,322,399,400,470])
+
         dataPath = self.runManager.dataDir
 
         if (self.thetaCenter is None or self.thetaCWHome is None or self.thetaCCWHome is None):
@@ -1338,8 +1382,8 @@ class FpsCmd(object):
             # variable declaration for center measurement
             steps = 300
             iteration = 6000 // steps
-            thetaFW = np.zeros((57, iteration+1), dtype=complex)
-            thetaRV = np.zeros((57, iteration+1), dtype=complex)
+            thetaFW = np.zeros((self.nCobras, iteration+1), dtype=complex)
+            thetaRV = np.zeros((self.nCobras, iteration+1), dtype=complex)
 
             #record the theta movements
             #self.cam.resetStack('thetaForwardStack.fits')
@@ -1371,10 +1415,10 @@ class FpsCmd(object):
             np.save(dataPath / 'thetaRV', thetaRV)
 
             # variable declaration
-            thetaCenter = np.zeros(57, dtype=complex)
-            thetaRadius = np.zeros(57, dtype=float)
-            thetaCCWHome = np.zeros(57, dtype=float)
-            thetaCWHome = np.zeros(57, dtype=float)
+            thetaCenter = np.zeros(self.nCobras, dtype=complex)
+            thetaRadius = np.zeros(self.nCobras, dtype=float)
+            thetaCCWHome = np.zeros(self.nCobras, dtype=float)
+            thetaCWHome = np.zeros(self.nCobras, dtype=float)
 
             # measure centers
             for c in self.goodIdx:
@@ -1407,11 +1451,11 @@ class FpsCmd(object):
             homes = self.thetaCCWHome[self.goodIdx]
 
         # convergence test
-        thetaData = np.zeros((57, runs, tries, 4))
+        thetaData = np.zeros((self.nCobras, runs, tries, 4))
         zeros = np.zeros(len(self.goodIdx))
         tGaps = ((self.pfi.calibModel.tht1 - self.pfi.calibModel.tht0) % (np.pi*2))[self.goodIdx]
-        notdoneMask = np.zeros(57, 'bool')
-        nowDone = np.zeros(57, 'bool')
+        notdoneMask = np.zeros(self.nCobras, 'bool')
+        nowDone = np.zeros(self.nCobras, 'bool')
         tolerance = np.deg2rad(tolerance)
 
         for i in range(runs):
@@ -1503,7 +1547,7 @@ class FpsCmd(object):
         else:
             if len(set(idx) & set(self.badIdx)) > 0:
                 raise RuntimeError('should not include invisible cobras')
-            _idx = np.zeros(57, 'bool')
+            _idx = np.zeros(self.nCobras, 'bool')
             _idx[idx] = True
             return np.where(_idx[self.goodIdx])[0]
 
@@ -1901,8 +1945,8 @@ class FpsCmd(object):
         tolerance=np.rad2deg(0.05)
         angle = (180.0 - phiAngle) / 2.0
         thetaAngles = np.full(len(self.allCobras), -angle, dtype='f4')
-        thetaAngles[np.arange(0,57,2)] += 0
-        thetaAngles[np.arange(1,57,2)] += 180
+        thetaAngles[np.arange(0,self.nCobras,2)] += 0
+        thetaAngles[np.arange(1,self.nCobras,2)] += 180
 
         if not hasattr(self, 'thetaHomes'):
             keepExisting = False
@@ -1919,12 +1963,20 @@ class FpsCmd(object):
         Assumes phi is at 60deg and that we know thetaPositions.
 
         """
+        self._connect()
+        self.setBrokenCobras(brokens=[139,172,194,226,322,399,400,470])
+
         phiAngle=60.0
         tolerance=np.rad2deg(0.05)
         angle = (180.0 - phiAngle) / 2.0
-        thetaAngles = np.full(len(self.allCobras), -angle, dtype='f4')
-        thetaAngles[np.arange(0,57,2)] += 90
-        thetaAngles[np.arange(1,57,2)] += 270
+        thetaAngles = np.full(self.nCobras, -angle, dtype='f4')
+        
+        thetaAngles[np.arange(0,171)] += 270        
+        thetaAngles[np.arange(171,342)] += 150
+        thetaAngles[np.arange(342,513)] += 30
+
+        thetaAngles[399] += 30
+
 
         if not hasattr(self, 'thetaHomes'):
             keepExisting = False
@@ -1978,10 +2030,10 @@ class FpsCmd(object):
         if steps[0] < steps[1]:
             steps = steps[1], steps[0]
 
-        slopeF = np.zeros(57)
-        slopeR = np.zeros(57)
-        ontF = np.zeros(57)
-        ontR = np.zeros(57)
+        slopeF = np.zeros(self.nCobras)
+        slopeR = np.zeros(self.nCobras)
+        ontF = np.zeros(self.nCobras)
+        ontR = np.zeros(self.nCobras)
         _ontF = []
         _ontR = []
         _spdF = []
@@ -1998,8 +2050,8 @@ class FpsCmd(object):
         spdF[spdF<limitSpeed] = limitSpeed
         spdR[spdR<limitSpeed] = limitSpeed
 
-        _ontF.append(np.full(57, onTimeHigh))
-        _ontR.append(np.full(57, onTimeHigh))
+        _ontF.append(np.full(self.nCobras, onTimeHigh))
+        _ontR.append(np.full(self.nCobras, onTimeHigh))
         _spdF.append(spdF.copy())
         _spdR.append(spdR.copy())
 
@@ -2015,7 +2067,7 @@ class FpsCmd(object):
                 ontR[ontR>onTimeHigh] = onTimeHigh
                 ontF[ontF<onTimeLow] = onTimeLow
                 ontR[ontR<onTimeLow] = onTimeLow
-                self.logger.info(f'Run {n+1}/{iteration}, onTime = {np.round([ontF, ontR],4)}')
+                self.logger.info(f'Run for {fast} on-time {n+1}/{iteration}, onTime = {np.round([ontF, ontR],4)}')
                 runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=repeat, steps=step, thetaOnTime=[ontF, ontR], fast=fast)
                 spdF = np.load(runDir / 'data' / 'thetaSpeedFW.npy')
                 spdR = np.load(runDir / 'data' / 'thetaSpeedRV.npy')
@@ -2039,11 +2091,11 @@ class FpsCmd(object):
         ontF[ontF>onTimeHigh] = onTimeHigh
         ontR[ontR>onTimeHigh] = onTimeHigh
 
-        # build motor maps
+        # build SLOW motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=repeat, steps=steps[0], thetaOnTime=[ontF, ontR], fast=False)
-        self.xml = runDir / 'output' / newXml
-        self.pfi.loadModel(self.xml)
+        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=repeat, steps=250, thetaOnTime=[ontF, ontR], fast=False)
+        self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+        self.pfi.loadModel([self.xml])
 
         # for fast on time
         ontF = self._searchOnTime(speeds[1], np.array(_spdF), np.array(_ontF))
@@ -2053,9 +2105,9 @@ class FpsCmd(object):
 
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=repeat, steps=steps[1], thetaOnTime=[ontF, ontR], fast=True)
-        self.xml = runDir / 'output' / newXml
-        self.pfi.loadModel(self.xml)
+        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=repeat, steps=125, thetaOnTime=[ontF, ontR], fast=True)
+        self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+        self.pfi.loadModel([self.xml])
 
         return self.xml
 
@@ -2077,6 +2129,10 @@ class FpsCmd(object):
             raise ValueError(f'steps parameter should be a two value tuples: {steps}')
         if steps[0] < steps[1]:
             steps = steps[1], steps[0]
+
+        # Getting current XML for total cobras
+        des = pfiDesign.PFIDesign(self.xml)
+        self.nCobras = len(des.centers)
 
         slopeF = np.zeros(self.nCobras)
         slopeR = np.zeros(self.nCobras)
@@ -2115,7 +2171,7 @@ class FpsCmd(object):
                 ontR[ontR>onTimeHigh] = onTimeHigh
                 ontF[ontF<onTimeLow] = onTimeLow
                 ontR[ontR<onTimeLow] = onTimeLow
-                self.logger.info(f'Run {n+1}/{iteration}, onTime = {np.round([ontF, ontR],4)}')
+                self.logger.info(f'Run for {fast} ontime {n+1}/{iteration}, onTime = {np.round([ontF, ontR],4)}')
                 runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=repeat, steps=step, phiOnTime=[ontF, ontR], fast=fast)
                 spdF = np.load(runDir / 'data' / 'phiSpeedFW.npy')
                 spdR = np.load(runDir / 'data' / 'phiSpeedRV.npy')
@@ -2142,8 +2198,8 @@ class FpsCmd(object):
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
         runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=repeat, steps=steps[0], phiOnTime=[ontF, ontR], fast=False)
-        self.xml = runDir / 'output' / newXml
-        self.pfi.loadModel(self.xml)
+        self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+        self.pfi.loadModel([self.xml])
 
         # for fast motor maps
         ontF = self._searchOnTime(speeds[1], np.array(_spdF), np.array(_ontF))
@@ -2152,14 +2208,16 @@ class FpsCmd(object):
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
         runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=repeat, steps=steps[1], phiOnTime=[ontF, ontR], fast=True)
-        self.xml = runDir / 'output' / newXml
-        self.pfi.loadModel(self.xml)
+        
+        self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+        self.pfi.loadModel([self.xml])
+        
 
         return self.xml
 
     def _searchOnTime(self, speed, sData, tData):
         """ There should be some better ways to do!!! """
-        onTime = np.zeros(57)
+        onTime = np.zeros(self.nCobras)
 
         for c in self.goodIdx:
             s = sData[:,c]
