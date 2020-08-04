@@ -268,7 +268,7 @@ class FpsCmd(object):
         #     self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
         #     self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
         #     self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(31,13)+1,
+        #     self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
         #     ]
         
         
