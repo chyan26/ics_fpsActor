@@ -141,7 +141,7 @@ class FpsCmd(object):
             ('gotoSafeFromPhi60','',self.gotoSafeFromPhi60),
             ('gotoVerticalFromPhi60','',self.gotoVerticalFromPhi60),
             ('makeMotorMap','@(phi|theta) <stepsize> <repeat> [@slowOnly]',self.makeMotorMap),
-            ('angleConverge','@(phi|theta) <angleTargets>',self.angleConverge),
+            ('angleConverge','@(phi|theta) <angleTargets> [@doGeometry]',self.angleConverge),
             ('motorOntimeSearch','@(phi|theta)',self.motorOntimeSearch),
             ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
@@ -182,7 +182,7 @@ class FpsCmd(object):
 
         self.fpgaHost = fpgaHost
         self.xml = None
-        self.brokens = [139,172,194,226,322,399,470]
+        self.brokens = None
         #self.camSplit = camSplit
 
         # partition module 1 cobras into odd and even sets
@@ -225,14 +225,14 @@ class FpsCmd(object):
                                   doLoadModel=False,
                                   logDir=self.runManager.logDir)
         
-        self.modules = [f'SC{m:02d}' for m in [1,2,3,15,16,17,29,30,31]]
+        self.modules = [f'SC{m:02d}' for m in [1,2,3,4,5,6,7,15,16,17,18,19,20,21,29,30,31,32,33,34,35]]
         self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
 
         self.pfi.loadModel(self.modFiles)
         
         
         if self.xml is None:
-            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/nineModule.xml'))
+            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/twentyoneModule-reCent.xml'))
         else:
             newModel = pfiDesign.PFIDesign(self.xml)
         
@@ -258,19 +258,28 @@ class FpsCmd(object):
         """ define the broken/good cobras """
         if brokens is None:
             brokens = []
-            brokens=[139,172,194,226,322,399,470]
+            brokens = [self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+                        self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
+                        self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
+                        self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
+                        self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+                        self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
+                        #self.pfi.calibModel..findCobraByModuleAndPositioner(30,1)+1,
+                        self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
+                        self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1]
         else:
             brokens = brokens
-        # brokens=[
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
-        #     self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
-        #     ]
-        
+        brokens = [self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(4,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
+                    #self.pfi.calibModel..findCobraByModuleAndPositioner(30,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1]
+
         
         visibles = [e for e in range(1, self.nCobras+1) if e not in brokens]
         self.badIdx = np.array(brokens) - 1
@@ -1186,11 +1195,24 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
 
+        doGeometryArg = 'doGeometry' in cmdKeys
+
         if phi is True:
+            
+            if doGeometryArg is True:
+                # Do geometry before every convergence test
+                self.phiCenter = None
+                self.phiCWHome = None 
+                self.phiCCWHome = None 
 
             self._phiConvergenceTest(cmd, margin=15.0, runs=runs, tries=8,tolerance=0.2, scaleFactor=2.0)
             cmd.finish(f'angleConverge of phi arm is finished')
         else:
+            if doGeometryArg is True:
+                # Do geometry before every convergence test
+                self.thetaCenter = None
+                self.thetaCWHome = None 
+                self.thetaCCWHome = None 
             self._thetaConvergenceTest(cmd, margin=15.0, runs=runs, tries=8,tolerance=0.2, scaleFactor=2.0)
             cmd.finish(f'angleConverge of theta arm is finished')
 
@@ -1453,7 +1475,7 @@ class FpsCmd(object):
         # convergence test
         thetaData = np.zeros((self.nCobras, runs, tries, 4))
         zeros = np.zeros(len(self.goodIdx))
-        tGaps = ((self.pfi.calibModel.tht1 - self.pfi.calibModel.tht0) % (np.pi*2))[self.goodIdx]
+        tGaps = ((self.pfi.calibModel.tht1 - self.pfi.calibModel.tht0+np.pi) % (np.pi*2)-np.pi)[self.goodIdx]
         notdoneMask = np.zeros(self.nCobras, 'bool')
         nowDone = np.zeros(self.nCobras, 'bool')
         tolerance = np.deg2rad(tolerance)
@@ -1971,9 +1993,9 @@ class FpsCmd(object):
         angle = (180.0 - phiAngle) / 2.0
         thetaAngles = np.full(self.nCobras, -angle, dtype='f4')
         
-        thetaAngles[np.arange(0,171)] += 270        
-        thetaAngles[np.arange(171,342)] += 150
-        thetaAngles[np.arange(342,513)] += 30
+        thetaAngles[np.arange(0,399)] += 270        
+        thetaAngles[np.arange(400,798)] += 150
+        thetaAngles[np.arange(799,1197)] += 30
 
         thetaAngles[399] += 30
 
@@ -2197,7 +2219,7 @@ class FpsCmd(object):
 
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=repeat, steps=steps[0], phiOnTime=[ontF, ontR], fast=False)
+        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=3, steps=steps[0], phiOnTime=[ontF, ontR], fast=False)
         self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
         self.pfi.loadModel([self.xml])
 
@@ -2207,7 +2229,7 @@ class FpsCmd(object):
 
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=repeat, steps=steps[1], phiOnTime=[ontF, ontR], fast=True)
+        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=3, steps=steps[1], phiOnTime=[ontF, ontR], fast=True)
         
         self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
         self.pfi.loadModel([self.xml])
