@@ -22,6 +22,8 @@ class Fps(actorcore.ICC.ICC):
 
             # reactor.callLater(10, self.status_check)
 
+    def getPositionsForFrame(self, frameId):
+        return self.cmdSets['FpsCmd'].getPositionsForFrame(frameId)
 
 def main():
     fps = Fps('fps', 'fpsActor')

@@ -293,6 +293,13 @@ class FpsCmd(object):
         if hasattr(self, 'cal'):
             self.cal.setBrokenCobras(brokens)
 
+    def getPositionsForFrame(self, frameId):
+        mcsData = self.nv.readCentroid(frameId)
+        self.logger.info(f'mcs data {mcsData.shape[0]}')
+        centroids = {'x':mcsData['centroidx'].values.astype('float'),
+                     'y':mcsData['centroidy'].values.astype('float')}
+        return centroids
+
     def exposeAndExtractPositions(self, cmd, name=None, guess=None, tolerance=None):
         """ Take an exposure, measure centroids, match to cobras, save info.
 
@@ -323,15 +330,9 @@ class FpsCmd(object):
         
         datapath, filename, frameId = self._mcsExpose(cmd, expTime=0.5, doCentroid=True)
         self.logger.info(f'path = {datapath} filename = {filename}, frame ID = {frameId}')
-        
-        # Now, get centroids
-        mcsData = self.nv.readCentroid(frameId)
-        self.logger.info(f'mcs data {mcsData.shape[0]}')
-        centroids = {'x':mcsData['centroidx'].values.astype('float'), 
-                     'y':mcsData['centroidy'].values.astype('float')}
-        
-        #print(visit)
-        #centroids, filename, bkgd = self.cam.expose(name)
+
+        centroids =  self.getPositionsForFrame(frameId)
+
         positions, indexMap = self.cal.matchPositions(centroids, guess=guess, tolerance=tolerance)
         
         self.logger.info(f'Matched positions = {len(positions)}')
