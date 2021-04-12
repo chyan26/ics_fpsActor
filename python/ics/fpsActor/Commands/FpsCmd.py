@@ -39,6 +39,8 @@ from ics.cobraCharmer import pfiDesign
 #from ics.cobraCharmer.utils import butler
 from ics.cobraCharmer.fpgaState import fpgaState
 from ics.cobraCharmer import cobraState
+reload(pfiControl)
+
 def unwrappedAngle(angle, fromAngle, toAngle,
                    tripAngle=np.pi, allowAngle=np.pi/6):
     """ Adjust angles near 0 accounting for possible overshoots given the move.
@@ -132,9 +134,15 @@ class FpsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
+            ('reset', '[<mask>]', self.reset),
+            ('power', '[<mask>]', self.power),
+            ('powerOn', '', self.powerOn),
+            ('powerOff', '', self.powerOff),
+            ('diag', '', self.diag),
+            ('connect', '', self.connect),
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
-            ('movePhiToAngle', '<angle>', self.movePhiToAngle),
+            ('movePhiToAngle', '<angle> <iteration>', self.movePhiToAngle),
             ('movePhiToHome','', self.movePhiToHome),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),            
             ('moveToDesign', '', self.moveToDesign),
@@ -164,9 +172,11 @@ class FpsCmd(object):
                                         keys.Key("endFrame", types.Int(), help="ending frame for "
                                                         "boresight calculating"),
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
+                                        keys.Key("iteration", types.Int(), help="Interation number"),
                                         keys.Key("id", types.Long(),
                                                  help=("fpsDesignId for the field, "
                                                        "which defines the fiber positions")),
+                                        keys.Key("mask", types.Int(), help="mask for power and/or reset"),
                                         keys.Key("expTime", types.Float(), 
                                                  help="Seconds for exposure"))
 
@@ -217,7 +227,7 @@ class FpsCmd(object):
         
         self.runManager = butler.RunTree(doCreate=False)
 
-    def _connect(self):
+    def _simpleConnect(self):
         self.runManager.newRun()
         reload(pfiControl)
         # Initializing COBRA module
@@ -225,18 +235,68 @@ class FpsCmd(object):
                                   doLoadModel=False,
                                   logDir=self.runManager.logDir)
         
-        self.modules = [f'SC{m:02d}' for m in [1,2,3,4,5,6,7,15,16,17,18,19,20,21,29,30,31,32,33,34,35]]
+        self.modules = [f'SC{m:02d}' for m in range(1,43)]
+        self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
+        self.pfi.loadModel(self.modFiles)
+
+        if self.xml is None:
+            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/allModule.xml'))
+        else:
+            newModel = pfiDesign.PFIDesign(self.xml)
+        self.pfi.calibModel = newModel
+        
+        self.allCobras = np.array(self.pfi.getAllDefinedCobras())
+        self.nCobras = len(self.allCobras)
+        
+    def _connect(self):
+        self.runManager.newRun()
+        reload(pfiControl)
+        # Initializing COBRA module
+        self.pfi = pfiControl.PFI(fpgaHost=self.fpgaHost,
+                                  doLoadModel=False,
+                                  logDir=self.runManager.logDir)
+
+        # It takes > 10s to power down.
+        # Power on is pretty much instant, but requires a reset as well.
+        # Two resets is the same a power on and a reset.
+        if True:
+            self.pfi.diag()
+            self.pfi.power(0)
+            time.sleep(1)
+            self.pfi.reset()
+            time.sleep(1)
+            self.pfi.diag()
+        else:
+            self.pfi.power(0x3f)
+            time.sleep(1)
+            self.pfi.power(0x3f)
+            time.sleep(1)
+            self.pfi.reset()
+            time.sleep(1)
+            self.pfi.diag()
+            time.sleep(1)
+            self.pfi.power(0)
+            time.sleep(1)
+            self.pfi.power(0)
+            time.sleep(1)
+            self.pfi.reset()
+            time.sleep(1)
+            self.pfi.diag()
+            
+        self.modules = [f'SC{m:02d}' for m in range(1,43)]
         self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
 
-        self.pfi.loadModel(self.modFiles)
+        #self.pfi.loadModel(self.modFiles)
         
         
         if self.xml is None:
-            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/twentyoneModule-reCent.xml'))
+            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/allModule.xml'))
         else:
             newModel = pfiDesign.PFIDesign(self.xml)
         
         self.pfi.calibModel = newModel
+        self.pfi.calibModel.fixModuleIds()
+        
         self.logger.info(f'Loading XML from {self.xml}')
 
         self.allCobras = np.array(self.pfi.getAllDefinedCobras())
@@ -251,8 +311,9 @@ class FpsCmd(object):
         self.cal = calculation.Calculation(self.pfi.calibModel, None, None)
 
         # define the broken/good cobras
-        self.logger.info(f'Setting broken fibers =  {self.brokens}')
+
         self.setBrokenCobras(brokens=self.brokens)
+        self.logger.info(f'Setting broken fibers =  {self.brokens}')
 
     def setBrokenCobras(self, brokens=None):
         """ define the broken/good cobras """
@@ -269,21 +330,61 @@ class FpsCmd(object):
                         self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1]
         else:
             brokens = brokens
-        brokens = [self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+        #brokens = [self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+        #            self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
+        #            self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
+        #            self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
+        #            self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+        #            self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
+                    #self.pfi.calibModel..findCobraByModuleAndPositioner(30,1)+1,
+        #            self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1]
+                    #self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1]
+
+        brokens = [self.pfi.calibModel.findCobraByModuleAndPositioner(1,47)+1,
+                    #self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
                     self.pfi.calibModel.findCobraByModuleAndPositioner(4,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,19)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,5)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(14,13)+1,
                     self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
                     self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
                     self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
                     self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(21,10)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(22,11)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(22,13)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(27,38)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(28,41)+1,
                     self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
-                    #self.pfi.calibModel..findCobraByModuleAndPositioner(30,1)+1,
                     self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1]
-
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,41)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(33,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(33,12)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(37,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,15)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,43)+1,
+                    ]
         
+        #brokens.append([189,290,447,559,589,607,809,1171,1252,1321,2033,2120,2136,2149,2163])
+        self.brokens = brokens   
         visibles = [e for e in range(1, self.nCobras+1) if e not in brokens]
+        # brokens = np.array([])
+        # for f in [3,4,7,8,11,12,13,14,17,18,21,22,23,24,25,26,31,32,35,36,39,40,41,42]:
+        #     brokens = np.append(brokens,self.pfi.calibModel.findCobraByModule(f))
+        #     brokens = (brokens+1).astype('int').tolist()
+        # visibles = [e for e in range(1, self.nCobras+1) if e not in brokens]
+        self.brokens = brokens 
+        
         self.badIdx = np.array(brokens) - 1
+        
         self.goodIdx = np.array(visibles) - 1
+        
+        
+        #self.goodIdx = np.arange(1197,1596)
+        #self.badIdx = [e for e in range(0,self.nCobras) if e not in self.goodIdx]
+        
         #self.badCobras = np.array(self.getCobras(self.badIdx))
         #self.goodCobras = np.array(self.getCobras(self.goodIdx))
         if len(self.badIdx) is not 0:
@@ -460,6 +561,69 @@ class FpsCmd(object):
 
         return None
 
+    def reset(self, cmd):
+        """Send the FPGA POWer command with a reset mask. """
+
+        cmdKeys = cmd.cmd.keywords
+        resetMask = cmdKeys['mask'].values[0] if 'mask' in cmdKeys else 0x3f
+        
+        self.pfi.reset(resetMask)
+        time.sleep(1)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def power(self, cmd):
+        """Send the FPGA POWer command with a sector mask. """
+
+        cmdKeys = cmd.cmd.keywords
+        powerMask = cmdKeys['mask'].values[0] if 'mask' in cmdKeys else 0x0
+        
+        self.pfi.power(powerMask)
+        time.sleep(1)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def powerOn(self, cmd):
+        """Do what is required to power on all PFI sectors. """
+
+        cmdKeys = cmd.cmd.keywords
+        
+        self.pfi.power(0x0)
+        time.sleep(1)
+        self.pfi.reset()
+        time.sleep(1)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def powerOff(self, cmd):
+        """Do what is required to power off all PFI sectors """
+
+        cmdKeys = cmd.cmd.keywords
+        
+        self.pfi.power(0x23f)
+        time.sleep(10)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def diag(self, cmd):
+        """Read the FPGA sector inventory"""
+
+        cmdKeys = cmd.cmd.keywords
+        
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def connect(self, cmd):
+        """Connect to the FPGA and set up output tree. """
+
+        cmdKeys = cmd.cmd.keywords
+        
+        self._simpleConnect()
+        time.sleep(2)
+        
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+        
     def loadDesign(self, cmd):
         """ Load our design from the given pfsDesignId. """
 
@@ -640,7 +804,7 @@ class FpsCmd(object):
         else:
             slowOnly = False
 
-        limitOnTime=0.08
+        #limitOnTime=0.08
         
         delta=0.1
 
@@ -701,7 +865,7 @@ class FpsCmd(object):
             totalSteps=5000,
             fast=False,
             phiOnTime=None,
-            updateGeometry=False,
+            updateGeometry=True,
             limitOnTime=0.08,
             limitSteps=5000,
             resetScaling=True,
@@ -883,6 +1047,7 @@ class FpsCmd(object):
                 self.logger.info(f'Updating on-time {phiOnTime}.')
                 self.cal.calibModel.updateOntimes(phiFwd=phiOnTime[0], phiRev=phiOnTime[1], fast=fast)
         if updateGeometry is True:
+            self.logger.info(f'Updating geometry in XML file = {newXml}.')
             self.cal.calibModel.updateGeometry(centers=phiCenter, phiArms=phiRadius)
         
         
@@ -930,7 +1095,35 @@ class FpsCmd(object):
                              fromHome=False):
         """ """
         self._connect()
-        self.setBrokenCobras(brokens=[139,172,194,226,322,399,400,470])
+
+        brokens = [self.pfi.calibModel.findCobraByModuleAndPositioner(1,47)+1,
+                    #self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(4,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,19)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,5)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(14,13)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(21,10)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(22,13)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(27,38)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(28,41)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,41)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(33,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(33,12)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(37,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,15)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,43)+1
+                    ]
+
+        self.setBrokenCobras(brokens=brokens)
+        self.logger.info(f'broken fibers={brokens} ')
         totalSteps = 12000
         defaultOnTimeFast = deepcopy([self.pfi.calibModel.motorOntimeFwd1,
                                       self.pfi.calibModel.motorOntimeRev1])
@@ -955,6 +1148,7 @@ class FpsCmd(object):
 
         # variable declaration for position measurement
         iteration = totalSteps // steps
+        self.logger.info(f'nCobra = {self.nCobras}, repeat={repeat} iteration={iteration+1}')
         thetaFW = np.zeros((self.nCobras, repeat, iteration+1), dtype=complex)
         thetaRV = np.zeros((self.nCobras, repeat, iteration+1), dtype=complex)
 
@@ -1394,7 +1588,32 @@ class FpsCmd(object):
     
     def _thetaConvergenceTest(self, cmd, margin=15.0, runs=50, tries=8, fast=False, tolerance=0.2, scaleFactor=1.0):
         self._connect()
-        self.setBrokenCobras(brokens=[139,172,194,226,322,399,400,470])
+        
+        brokens = [self.pfi.calibModel.findCobraByModuleAndPositioner(1,47)+1,
+                    #self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(4,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,19)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,5)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(14,13)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(21,10)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(22,13)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(27,38)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(28,41)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,41)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(33,12)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(37,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,15)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,43)+1
+                    ]
+        self.setBrokenCobras(brokens=brokens)
 
         dataPath = self.runManager.dataDir
 
@@ -1475,7 +1694,7 @@ class FpsCmd(object):
         # convergence test
         thetaData = np.zeros((self.nCobras, runs, tries, 4))
         zeros = np.zeros(len(self.goodIdx))
-        tGaps = ((self.pfi.calibModel.tht1 - self.pfi.calibModel.tht0+np.pi) % (np.pi*2)-np.pi)[self.goodIdx]
+        tGaps = (((self.pfi.calibModel.tht1 - self.pfi.calibModel.tht0+np.pi) % (np.pi*2))-np.pi)[self.goodIdx]
         notdoneMask = np.zeros(self.nCobras, 'bool')
         nowDone = np.zeros(self.nCobras, 'bool')
         tolerance = np.deg2rad(tolerance)
@@ -1555,9 +1774,15 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
         angle = cmd.cmd.keywords['angle'].values[0]
         
+        
+        itr = cmd.cmd.keywords['iteration'].values[0]
+
+        if itr == 0:
+            itr = 8
+
         self.logger.info(f'Move phi to angle = {angle}')
             
-        datapath = self._moveToPhiAngle(cmd, angle=angle, keepExistingPosition=False)
+        datapath = self._moveToPhiAngle(cmd, angle=angle, maxTries=itr, keepExistingPosition=False)
 
         self.logger.info(f'Data path : {datapath}')    
         cmd.finish(f'PHI is now at {angle} degress!!')
@@ -1575,8 +1800,8 @@ class FpsCmd(object):
 
     def _moveToPhiAngle(self, cmd, idx=None, angle=60.0,
                        keepExistingPosition=False,
-                       tolerance=np.rad2deg(0.005), maxTries=8,
-                       scaleFactor=5,
+                       tolerance=np.rad2deg(0.005), maxTries=10,
+                       scaleFactor=5.0,
                        doFast=False):
         """
         Robustly move to a given phi angle.
@@ -1739,7 +1964,7 @@ class FpsCmd(object):
                     else:
                         logCall = self.logger.debug
 
-                    logCall(f'{c_i+1} at={np.rad2deg(atAngles[c_i]):0.2f} '
+                    logCall(f'{c_i} at={np.rad2deg(atAngles[c_i]):0.2f} '
                             f'try={np.rad2deg(tryDist):0.2f} '
                             f'got={np.rad2deg(gotDist):0.2f} '
                             f'rawScale={rawScale:0.2f} scale={scale:0.2f}')
@@ -1748,7 +1973,9 @@ class FpsCmd(object):
             lastAngles = atAngles
             if ntries >= maxTries:
                 self.logger.warn(f'Reached max {maxTries} tries, {notDone.sum()} cobras left')
-                self.logger.warn(f'   cobras: {[c.cobraNum for c in cobras[np.where(notDone)]]}')
+                #self.logger.warn(f'   cobras: {[c.cobraNum for c in cobras[np.where(notDone)]]}')
+                self.logger.warn(f'   cobras: {[str(c) for c in cobras[np.where(notDone)]]}')
+                self.logger.warn(f'   position: {np.round(np.rad2deg(atAngles)[notDone], 2)}')
                 self.logger.warn(f'   left: {np.round(np.rad2deg(left)[notDone], 2)}')
 
                 _, phiSteps = self.pfi.moveThetaPhi(cobras[notDone],
@@ -1770,7 +1997,7 @@ class FpsCmd(object):
    
     def _moveToThetaAngle(self, cmd, idx=None, angle=60.0,
                          keepExistingPosition=False,
-                         tolerance=1.0, maxTries=7, scaleFactor=5.0,
+                         tolerance=1.0, maxTries=12, scaleFactor=5.0,
                          globalAngles=False,
                          doFast=False):
         """
@@ -1939,7 +2166,9 @@ class FpsCmd(object):
             self.thetaAngles[idx] = atAngles
             if ntries >= maxTries:
                 self.logger.warn(f'Reached max {maxTries} tries, {notDone.sum()} cobras left')
-                self.logger.warn(f'   cobras: {[c.cobraNum for c in cobras[np.where(notDone)]]}')
+                self.logger.warn(f'   cobras: {[str(c) for c in cobras[np.where(notDone)]]}')
+                #self.logger.warn(f'   cobras: {[c.cobraNum for c in cobras[np.where(notDone)]]}')
+                self.logger.warn(f'   position: {np.round(np.rad2deg(atAngles)[notDone], 2)}')
                 self.logger.warn(f'   left: {np.round(np.rad2deg(left)[notDone], 2)}')
 
                 thetaSteps, _ = self.pfi.moveThetaPhi(cobras[notDone],
@@ -1986,18 +2215,44 @@ class FpsCmd(object):
 
         """
         self._connect()
-        self.setBrokenCobras(brokens=[139,172,194,226,322,399,400,470])
+        
+        broken = [self.pfi.calibModel.findCobraByModuleAndPositioner(1,47)+1,
+                    #self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(4,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,19)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,5)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(14,13)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(21,10)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(22,13)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(27,38)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(28,41)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,22)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,41)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(33,12)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(37,1)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,15)+1,
+                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,43)+1
+                    ]
+        #broken.append([189,290,447,559,589,607,809,1171,1252,1321,2033,2120,2136,2149,2163])
+        self.setBrokenCobras(brokens=broken)
 
         phiAngle=60.0
         tolerance=np.rad2deg(0.05)
         angle = (180.0 - phiAngle) / 2.0
         thetaAngles = np.full(self.nCobras, -angle, dtype='f4')
         
-        thetaAngles[np.arange(0,399)] += 270        
-        thetaAngles[np.arange(400,798)] += 150
-        thetaAngles[np.arange(799,1197)] += 30
+        thetaAngles[np.arange(0,799)] += 270        
+        thetaAngles[np.arange(799,1596)] += 150
+        thetaAngles[np.arange(1596,2394)] += 30
 
-        thetaAngles[399] += 30
+        #thetaAngles[855] += 30
 
 
         if not hasattr(self, 'thetaHomes'):
@@ -2052,6 +2307,11 @@ class FpsCmd(object):
         if steps[0] < steps[1]:
             steps = steps[1], steps[0]
 
+        # Getting current XML for total cobras
+        des = pfiDesign.PFIDesign(self.xml)
+        self.nCobras = len(des.centers)
+
+
         slopeF = np.zeros(self.nCobras)
         slopeR = np.zeros(self.nCobras)
         ontF = np.zeros(self.nCobras)
@@ -2085,8 +2345,8 @@ class FpsCmd(object):
                 ontR[c_i] = self.thetaModel.getOntimeFromData(speed, _spdR[0][c_i], onTimeHigh)
 
             for n in range(iteration):
-                ontF[ontF>onTimeHigh] = onTimeHigh
-                ontR[ontR>onTimeHigh] = onTimeHigh
+                ontF[ontF>self.pfi.maxThetaOntime] = self.pfi.maxThetaOntime
+                ontR[ontR>self.pfi.maxThetaOntime] = self.pfi.maxThetaOntime
                 ontF[ontF<onTimeLow] = onTimeLow
                 ontR[ontR<onTimeLow] = onTimeLow
                 self.logger.info(f'Run for {fast} on-time {n+1}/{iteration}, onTime = {np.round([ontF, ontR],4)}')
@@ -2115,7 +2375,7 @@ class FpsCmd(object):
 
         # build SLOW motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=repeat, steps=250, thetaOnTime=[ontF, ontR], fast=False)
+        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=3, steps=250, thetaOnTime=[ontF, ontR], fast=False)
         self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
         self.pfi.loadModel([self.xml])
 
@@ -2127,7 +2387,7 @@ class FpsCmd(object):
 
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=repeat, steps=125, thetaOnTime=[ontF, ontR], fast=True)
+        runDir, duds = self._makeThetaMotorMap(cmd, newXml, repeat=3, steps=125, thetaOnTime=[ontF, ontR], fast=True)
         self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
         self.pfi.loadModel([self.xml])
 
@@ -2135,7 +2395,7 @@ class FpsCmd(object):
 
     def _phiOnTimeSearch(self, cmd, newXml, speeds=(0.06,0.12), steps=(500,250), iteration=3, repeat=1, b=0.07):
         """ search the on time parameters for a specified motor speed """
-        onTimeHigh = 0.05
+        onTimeHigh = 0.08
         onTimeLow = 0.01
         onTimeHighSteps = 100
 
@@ -2189,8 +2449,8 @@ class FpsCmd(object):
                 ontR[c_i] = self.phiModel.getOntimeFromData(speed, _spdR[0][c_i], onTimeHigh)
 
             for n in range(iteration):
-                ontF[ontF>onTimeHigh] = onTimeHigh
-                ontR[ontR>onTimeHigh] = onTimeHigh
+                ontF[ontF>self.pfi.maxPhiOntime] = self.pfi.maxPhiOntime
+                ontR[ontR>self.pfi.maxPhiOntime] = self.pfi.maxPhiOntime
                 ontF[ontF<onTimeLow] = onTimeLow
                 ontR[ontR<onTimeLow] = onTimeLow
                 self.logger.info(f'Run for {fast} ontime {n+1}/{iteration}, onTime = {np.round([ontF, ontR],4)}')
@@ -2214,12 +2474,12 @@ class FpsCmd(object):
         # try to find best on time, maybe.....
         ontF = self._searchOnTime(speeds[0], np.array(_spdF), np.array(_ontF))
         ontR = self._searchOnTime(speeds[0], np.array(_spdR), np.array(_ontR))
-        ontF[ontF>onTimeHigh] = onTimeHigh
-        ontR[ontR>onTimeHigh] = onTimeHigh
+        ontF[ontF>self.pfi.maxPhiOntime] = self.pfi.maxPhiOntime
+        ontR[ontR>self.pfi.maxPhiOntime] = self.pfi.maxPhiOntime
 
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=3, steps=steps[0], phiOnTime=[ontF, ontR], fast=False)
+        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=3, steps=250, phiOnTime=[ontF, ontR], fast=False)
         self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
         self.pfi.loadModel([self.xml])
 
@@ -2229,7 +2489,7 @@ class FpsCmd(object):
 
         # build motor maps
         self.logger.info(f'Build motor maps, best onTime = {np.round([ontF, ontR],4)}')
-        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=3, steps=steps[1], phiOnTime=[ontF, ontR], fast=True)
+        runDir, duds = self._makePhiMotorMap(cmd, newXml, repeat=3, steps=125, phiOnTime=[ontF, ontR], fast=True)
         
         self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
         self.pfi.loadModel([self.xml])
