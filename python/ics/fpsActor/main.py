@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+import opscore.utility.sdss3logging
 import actorcore.ICC
 
 class Fps(actorcore.ICC.ICC):

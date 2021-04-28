@@ -39,85 +39,13 @@ from ics.cobraCharmer import pfiDesign
 #from ics.cobraCharmer.utils import butler
 from ics.cobraCharmer.fpgaState import fpgaState
 from ics.cobraCharmer import cobraState
+
+from procedures.moduleTest import cobraCoach
+from procedures.moduleTest import engineer as eng
+
 reload(pfiControl)
-
-def unwrappedAngle(angle, fromAngle, toAngle,
-                   tripAngle=np.pi, allowAngle=np.pi/6):
-    """ Adjust angles near 0 accounting for possible overshoots given the move.
-
-    Args
-    ----
-    angle : radians
-       The angle from CCW limit which we want to adjust.
-    fromAngle : radians
-       The start of the last move
-    toAngle : radians
-       The destination of the last move
-    tripAngle : radians
-       If the destination is within `tripAngle` of 0 or 2pi,
-       possibly adjust `angle` if we believe 0 was crossed.
-    allowAngle : radians
-       If `tripAngle` was crossed and `angle` is within `allowAngle`
-       of 0 on the other side, convert `angle` to be continuous with motion from
-       `fromAngle` to `toAngle`.
-
-    Returns
-    -------
-    angle : radians
-       The full angle, which can be both slightly negative and slightly above 2pi.
-
-    Given tripAngle is 90 and allowAngle is 30:
-
-    If moving DOWN past 90 or UP from < 0 and target < 90
-      turn 360..330 to 0..-30
-
-    If moving UP past 270 or DOWN from > 360 and target > 270
-      turn 0..45 to 360..405
-    """
-
-    angle = np.atleast_1d(angle)
-
-    motion = toAngle - fromAngle
-    motion = np.atleast_1d(motion)
-
-    AND = np.logical_and
-
-    # Allow motion down past 0: turn angle negative
-    down_w = AND(motion < 0, toAngle < tripAngle)
-    down_w |= AND(motion > 0, AND(fromAngle < 0, toAngle < tripAngle))
-    down_w &= angle > (2*np.pi - allowAngle)
-    angle[down_w] -= 2*np.pi
-
-    # Allow motion up past 0: let angle go past 360
-    up_w = AND(motion > 0, toAngle > 2*np.pi - tripAngle)
-    up_w |= AND(motion < 0, AND(fromAngle > 2*np.pi, toAngle > 2*np.pi - tripAngle))
-    up_w &= (angle < allowAngle)
-    angle[up_w] += 2*np.pi
-
-    return angle
-
-def unwrappedPosition(pos, center, homeAngle, fromAngle, toAngle,
-                      tripAngle=np.pi, allowAngle=np.pi/4):
-    """ Return the angle for a given position accounting for overshoots across 0.
-
-    See unwrappedAngle.
-    """
-    # Get the pos angle from the center, normalized to 0..2pi
-    rawAngle = np.angle(pos - center)
-    rawAngle = np.atleast_1d(rawAngle)
-    rawAngle[rawAngle<0] += 2*np.pi
-
-    # Get the angle w.r.t. home, normalized to 0..2pi
-    diffAngle = rawAngle - homeAngle
-    diffAngle[diffAngle<0] += 2*np.pi
-    diffAngle[diffAngle>=2*np.pi] -= 2*np.pi
-
-    return unwrappedAngle(diffAngle, fromAngle, toAngle,
-                          tripAngle=tripAngle, allowAngle=allowAngle)
-
-fpgaHost = '128.149.77.24'
-#xml = pathlib.Path('/home/pfs/mhs/devel/pfs_instdata/data/pfi/modules/SC01/SC01_pfi.xml')
-
+reload(cobraCoach)
+    
 class FpsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -181,19 +109,33 @@ class FpsCmd(object):
                                                  help="Seconds for exposure"))
 
         self.logger = logging.getLogger('fps')
-        self.logger.setLevel(logging.DEBUG)
+        self.logger.setLevel(logging.INFO)
 
+
+        self.cc = None
+        
+
+    def loadModel(self, cmd):
+        
+        xml = cmd.cmd.keywords['xml'].values[0]
+        self.logger.info(f'Input XML file = {xml}')
+        self.xml = pathlib.Path(xml)
+
+        mod = 'ALL'
+        self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+        self.cc.loadModel(file=pathlib.Path(self.xml))
+        #self.cc.connect()
+        eng.setCobraCoach(self.cc)
+
+        #self.cc = cc
+        #eng.setPhiMode()
+        cmd.finish(f"text='Loading model = {self.xml}'")
+
+
+    def _fpsInit(self):
         """ Init module 1 cobras """
 
-        # NO, not 1!! Pass in moduleName, etc. -- CPL
-        reload(pfiControl)
-        #self.allCobras = np.array(pfiControl.PFI.allocateCobraModule(1))
-        #self.nCobras = len(self.allCobras)
-
-        self.fpgaHost = fpgaHost
         self.xml = None
-        self.brokens = None
-        #self.camSplit = camSplit
 
         # partition module 1 cobras into odd and even sets
         #moduleCobras = {}
@@ -204,28 +146,6 @@ class FpsCmd(object):
         #self.oddCobras = moduleCobras[1]
         #self.evenCobras = moduleCobras[2]
 
-        self.pfi = None
-
-        self.thetaCenter = None
-        self.thetaCCWHome = None
-        self.thetaCWHome = None
-        self.phiCenter = None
-        self.phiCCWHome = None
-        self.phiCWHome = None
-
-        #self.setBrokenCobras(self.brokens)
-
-        self.dataPath = None
-
-
-        self.phiRunDir = None
-        self.thetaRunDir = None
-
-        self.minScalingAngle = np.deg2rad(2.0)
-        self.thetaModel = SpeedModel(p1=0.09)
-        self.phiModel = SpeedModel(p1=0.07)
-        
-        self.runManager = butler.RunTree(doCreate=False)
 
     def _simpleConnect(self):
         self.runManager.newRun()
@@ -547,7 +467,7 @@ class FpsCmd(object):
         cmd.diag('text="FPS ready to go."')
         cmd.finish()
     
-    def loadModel(self, cmd):
+    def XXloadModel(self, cmd):
         
         xml = cmd.cmd.keywords['xml'].values[0]
         self.logger.info(f'Input XML file = {xml}')
@@ -815,13 +735,15 @@ class FpsCmd(object):
 
         #print(self.goodIdx)
         if phi is True:
+            eng.setPhiMode()
             steps = stepsize
             #repeat = 3
             day = time.strftime('%Y-%m-%d')
             
             self.logger.info(f'Running PHI SLOW motor map.')
             newXml= f'{day}-phi-slow.xml'
-            runDir, bad = self._makePhiMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
+            #runDir, bad = self._makePhiMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
+            runDir, bad =eng.makePhiMotorMaps(newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.pfi.loadModel([self.xml])
@@ -829,9 +751,10 @@ class FpsCmd(object):
             if slowOnly is False:
                 self.logger.info(f'Running PHI Fast motor map.')
                 newXml= f'{day}-phi-final.xml'
-                runDir, bad = self._makePhiMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
+                runDir, bad = eng.makePhiMotorMaps(newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True)
 
         else:
+            eng.setThetaMode()
             steps = stepsize
             #repeat = 3
             day = time.strftime('%Y-%m-%d')
@@ -839,7 +762,8 @@ class FpsCmd(object):
             
             self.logger.info(f'Running THETA SLOW motor map.')
             newXml= f'{day}-theta-slow.xml'
-            runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
+            #runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
+            runDir, bad = eng.makeThetaMotorMaps(newXml, totalSteps=10000, repeat=repeat,steps=steps,delta=delta, fast=False)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.pfi.loadModel([self.xml])
@@ -847,7 +771,8 @@ class FpsCmd(object):
             if slowOnly is False:
                 self.logger.info(f'Running THETA FAST motor map.')
                 newXml= f'{day}-theta-final.xml'
-                runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
+                #runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
+                runDir, bad = eng.makeThetaMotorMaps(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
             
         cmd.finish(f'Motor map sequence finished')
     
