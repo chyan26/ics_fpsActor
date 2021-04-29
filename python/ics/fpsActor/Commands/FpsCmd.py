@@ -72,12 +72,14 @@ class FpsCmd(object):
             ('loadModel', '<xml>', self.loadModel),
             ('movePhiToAngle', '<angle> <iteration>', self.movePhiToAngle),
             ('movePhiToHome','', self.movePhiToHome),
+            ('moveToHome','@(phi|theta|all)', self.moveToHome),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),            
             ('moveToDesign', '', self.moveToDesign),
             ('gotoSafeFromPhi60','',self.gotoSafeFromPhi60),
             ('gotoVerticalFromPhi60','',self.gotoVerticalFromPhi60),
             ('makeMotorMap','@(phi|theta) <stepsize> <repeat> [@slowOnly]',self.makeMotorMap),
             ('angleConverge','@(phi|theta) <angleTargets> [@doGeometry]',self.angleConverge),
+            ('targetConverge','@(ontime|speed) <totalTargets> <maxsteps>',self.targetConverge),
             ('motorOntimeSearch','@(phi|theta)',self.motorOntimeSearch),
             ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
@@ -93,6 +95,10 @@ class FpsCmd(object):
                                                      "map generation"),
                                         keys.Key("angleTargets", types.Int(), 
                                                         help="Target number for angle convergence"),
+                                        keys.Key("totalTargets", types.Int(), 
+                                                        help="Target number for 2D convergence"),
+                                        keys.Key("maxsteps", types.Int(), 
+                                                        help="Maximum step number for 2D convergence test"),                
                                         keys.Key("xml", types.String(), help="XML filename"),
                                         keys.Key("runDir", types.String(), help="Directory of run data"),
                                         keys.Key("startFrame", types.Int(), help="starting frame for "
@@ -776,8 +782,25 @@ class FpsCmd(object):
             
         cmd.finish(f'Motor map sequence finished')
     
+    def moveToHome(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+        all = 'all' in cmdKeys
+        
+        # move to home position
+        self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+
+        cmd.finish(f'Move all arms back to home')
+
+
     def movePhiToHome(self, cmd):
         cmdKeys = cmd.cmd.keywords
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
 
         self._connect()
         totalSteps = 6000
@@ -1305,6 +1328,30 @@ class FpsCmd(object):
                                                 updateGeometry=False,
                                                 fromHome=fromHome)
         return runDir, duds
+
+    def targetConverge(self, cmd):
+        """ Making target convergence test. """
+        cmdKeys = cmd.cmd.keywords
+        runs = cmd.cmd.keywords['totalTargets'].values[0]
+        maxsteps = cmd.cmd.keywords['maxsteps'].values[0]
+        ontime = 'ontime' in cmdKeys
+        speed = 'speed' in cmdKeys
+        
+        eng.setNormalMode()
+        self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+        if ontime is True:
+            
+            self.logger.info(f'Run convergence test of {runs} targets with constant on-time') 
+            self.logger.info(f'Setting max step = {maxsteps}')
+            eng.setConstantOntimeMode(maxSteps=1000)
+            
+            targets, moves = eng.convergenceTest2(self.cc.goodIdx, runs=runs, thetaMargin=np.deg2rad(15.0), 
+                                phiMargin=np.deg2rad(15.0), thetaOffset=0, 
+                                phiAngle=(np.pi*5/6, np.pi/3, np.pi/4), 
+                                tries=16, tolerance=0.2, threshold=20.0, 
+                                newDir=True, twoSteps=False)
+        
+        cmd.finish(f'target convergece is finished')
 
 
     def angleConverge(self, cmd):
