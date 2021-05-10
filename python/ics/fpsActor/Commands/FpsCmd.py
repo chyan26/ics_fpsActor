@@ -27,8 +27,8 @@ from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
 from ics.fpsActor.utils import butler
-#import mcsActor.Visualization.mcsRoutines as mcs
-#import mcsActor.Visualization.fpsRoutines as fps
+from ics.fpsActor.utils import display as vis
+reload(vis)
 
 from procedures.moduleTest import calculation
 reload(calculation)
@@ -36,7 +36,6 @@ from procedures.moduleTest.speedModel import SpeedModel
 
 from ics.cobraCharmer import pfi as pfiControl
 from ics.cobraCharmer import pfiDesign
-#from ics.cobraCharmer.utils import butler
 from ics.cobraCharmer.fpgaState import fpgaState
 from ics.cobraCharmer import cobraState
 
@@ -68,10 +67,10 @@ class FpsCmd(object):
             ('powerOff', '', self.powerOff),
             ('diag', '', self.diag),
             ('connect', '', self.connect),
+            ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
             ('movePhiToAngle', '<angle> <iteration>', self.movePhiToAngle),
-            ('movePhiToHome','', self.movePhiToHome),
             ('moveToHome','@(phi|theta|all)', self.moveToHome),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),            
             ('moveToObsTarget', '', self.moveToObsTarget),
@@ -81,6 +80,7 @@ class FpsCmd(object):
             ('angleConverge','@(phi|theta) <angleTargets> [@doGeometry]',self.angleConverge),
             ('targetConverge','@(ontime|speed) <totalTargets> <maxsteps>',self.targetConverge),
             ('motorOntimeSearch','@(phi|theta)',self.motorOntimeSearch),
+            ('visCobraSpots','@(phi|theta) <runDir>',self.visCobraSpots),
             ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
             ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
             ('testLoop', '[<cnt>] [<expTime>] [<visit>]', self.testLoop),
@@ -284,56 +284,6 @@ class FpsCmd(object):
 
         return a
 
-    def _saveMoveTable(self, expId, positions, indexMap):
-        """ Save cobra move and spot information to a file.
-
-        Args
-        ----
-        expId : `str`
-          An exposure identifier. We want "PFxxNNNNNNNN".
-        positions : `ndarray` of complex coordinates.
-          What the matcher thinks is the cobra position.
-        indexMap : `ndarray` of `int`
-          For each of our cobras, the index of measured spot
-
-        """
-        moveTable = np.zeros(len(positions), dtype=self.movesDtype)
-        moveTable['expId'][:] = expId
-        if len(positions) != len(self.goodCobras):
-            raise RuntimeError("Craig is confused about cobra lists")
-
-        for pos_i, pos in enumerate(positions):
-            cobraInfo = self.goodCobras[pos_i]
-            cobraNum = self.pfi.calibModel.findCobraByModuleAndPositioner(cobraInfo.module,
-                                                                          cobraInfo.cobraNum)
-            moveInfo = fpgaState.cobraLastMove(cobraInfo)
-
-            phiMotorId = cobraState.mapId(cobraNum, 'phi', 'ccw' if moveInfo['phiSteps'] < 0 else 'cw')
-            thetaMotorId = cobraState.mapId(cobraNum, 'theta', 'ccw' if moveInfo['thetaSteps'] < 0 else 'cw')
-            phiScale = self.pfi.ontimeScales.get(phiMotorId, 1.0)
-            thetaScale = self.pfi.ontimeScales.get(thetaMotorId, 1.0)
-            moveTable['spotId'][pos_i] = indexMap[pos_i]
-            moveTable['module'][pos_i] = cobraInfo.module
-            moveTable['cobra'][pos_i] = cobraInfo.cobraNum
-            for field in ('phiSteps', 'phiOntime',
-                          'thetaSteps', 'thetaOntime'):
-                moveTable[field][pos_i] = moveInfo[field]
-            moveTable['thetaOntimeScale'] = thetaScale
-            moveTable['phiOntimeScale'] = phiScale
-
-        movesPath = self.runManager.outputDir / "moves.npz"
-        self.logger.debug(f'saving {len(moveTable)} moves to {movesPath}')
-        if movesPath.exists():
-            with open(movesPath, 'rb') as f:
-                oldMoves = np.load(f)['moves']
-            allMoves = np.concatenate([oldMoves, moveTable])
-        else:
-            allMoves = moveTable
-
-        with open(movesPath, 'wb') as f:
-            np.savez_compressed(f, moves=allMoves)
-
-
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
 
@@ -421,7 +371,28 @@ class FpsCmd(object):
         
         res = self.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
+
+    def ledlight(self, cmd):
+        """Turn on/off the fiducial fiber light"""
+        cmdKeys = cmd.cmd.keywords
+
+        light_on = 'on' in cmdKeys
+        light_off = 'off' in cmdKeys
+
+        if light_on:
+            cmdString = f'led on'
+            infoString = 'Turn on fiducial fibers'
+            
+        else:
+            cmdString = f'led off'
+            infoString = 'Turn off fiducial fibers'
         
+        cmdVar = self.actor.cmdr.call(actor='peb', cmdStr=cmdString,
+                                       forUserCmd=cmd, timout=10)
+           
+        self.logger.info(f'{infoString}')
+   
+
     def loadDesign(self, cmd):
         """ Load our design from the given pfsDesignId. """
 
@@ -545,20 +516,6 @@ class FpsCmd(object):
 
         cmd.finish(f'Move all arms back to home')
 
-
-    def movePhiToHome(self, cmd):
-        cmdKeys = cmd.cmd.keywords
-
-        phi = 'phi' in cmdKeys
-        theta = 'theta' in cmdKeys
-
-
-        self._connect()
-        totalSteps = 6000
-        self.logger.info(f'phi home {-totalSteps} steps')
-        self.pfi.moveAllSteps(self.goodCobras, 0, -totalSteps)
-
-        cmd.finish(f'Move Phi back to home')
 
 
     def targetConverge(self, cmd):
@@ -973,7 +930,23 @@ class FpsCmd(object):
         np.save(dataPath / 'thetaData', thetaData)
         self.pfi.resetMotorScaling(self.goodCobras, 'theta')
         return self.runManager.runDir
-    
+
+    def moveToThetaAngleFromPhi60(self, cmd):
+        """ Move cobras to nominal safe position: thetas OUT, phis in.
+        Assumes phi is at 60deg and that we know thetaPositions.
+        """
+        phiAngle=60.0
+        tolerance=np.rad2deg(0.05)
+        angle = (180.0 - phiAngle) / 2.0
+        thetaAngles = np.full(len(self.allCobras), -angle, dtype='f4')
+        thetaAngles[np.arange(0,self.nCobras,2)] += 0
+        thetaAngles[np.arange(1,self.nCobras,2)] += 180
+        
+        dataPath, diffAngles, moves = eng.moveThetaAngles(cc.goodIdx, thetaAngles, 
+            relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)       
+        
+        cmd.finish(f'gotoSafeFromPhi60 is finished')
+
     def movePhiToAngle(self, cmd):
         """ Making comvergence test for a specific arm. """
         cmdKeys = cmd.cmd.keywords
@@ -1310,3 +1283,13 @@ class FpsCmd(object):
 
         cmd.finish("text='Testing loop finished.'")
 
+    def visCobraSpots(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+        runDir = pathlib.Path(cmd.cmd.keywords['runDir'].values[0])
+        self.logger.info(f'Loading model = {self.xml}')
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+        if phi:        
+            vis.visCobraSpots(runDir,self.xml, arm='phi')
+        
