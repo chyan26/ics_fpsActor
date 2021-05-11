@@ -527,6 +527,7 @@ class FpsCmd(object):
         speed = 'speed' in cmdKeys
         
         eng.setNormalMode()
+        self.logger.info(f'Moving cobra to home position') 
         self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
         if ontime is True:
             
@@ -558,6 +559,15 @@ class FpsCmd(object):
 
             eng.setConstantSpeedMaps(mmTheta, mmPhi, mmThetaSlow, mmPhiSlow)
         
+            eng.setConstantSpeedMode(maxSegments=int({maxsteps}/100), maxSteps=100)
+
+            self.logger.info(f'Setting maxstep = 100, nSeg = {int({maxsteps}/100)}')
+            targets, moves = eng.convergenceTest2(cc.goodIdx, runs=runs, 
+                thetaMargin=np.deg2rad(15.0), phiMargin=np.deg2rad(15.0), 
+                thetaOffset=0, phiAngle=(np.pi*5/6, np.pi/3, np.pi/4), 
+                tries=16, tolerance=0.2, threshold=20.0, newDir=True, twoSteps=False)
+
+
         cmd.finish(f'target convergece is finished')
 
 
@@ -575,12 +585,12 @@ class FpsCmd(object):
             self.logger.info(f'Run phi convergence test of {runs} targets') 
             eng.setPhiMode()
 
-            #eng.phiConvergenceTest(cc.goodIdx, runs=2, tries=12, fast=False, tolerance=0.1)
+            #eng.phiConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
             cmd.finish(f'angleConverge of phi arm is finished')
         else:
             self.logger.info(f'Run theta convergence test of {runs} targets') 
-            
-            #eng.phiConvergenceTest(cc.goodIdx, runs=2, tries=12, fast=False, tolerance=0.1)
+            eng.setThetaMode()
+            #eng.thetaConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
             cmd.finish(f'angleConverge of theta arm is finished')
 
  
