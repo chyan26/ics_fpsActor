@@ -42,6 +42,10 @@ from ics.cobraCharmer import cobraState
 from procedures.moduleTest import cobraCoach
 from procedures.moduleTest import engineer as eng
 
+import subprocess as sub
+import os
+import signal
+
 reload(pfiControl)
 reload(cobraCoach)
     
@@ -67,6 +71,7 @@ class FpsCmd(object):
             ('powerOff', '', self.powerOff),
             ('diag', '', self.diag),
             ('connect', '', self.connect),
+            ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
@@ -77,6 +82,7 @@ class FpsCmd(object):
             ('gotoSafeFromPhi60','',self.gotoSafeFromPhi60),
             ('gotoVerticalFromPhi60','',self.gotoVerticalFromPhi60),
             ('makeMotorMap','@(phi|theta) <stepsize> <repeat> [@slowOnly]',self.makeMotorMap),
+            ('makeOntimeMap','@(phi|theta)',self.makeOntimeMap),
             ('angleConverge','@(phi|theta) <angleTargets>',self.angleConverge),
             ('targetConverge','@(ontime|speed) <totalTargets> <maxsteps>',self.targetConverge),
             ('motorOntimeSearch','@(phi|theta)',self.motorOntimeSearch),
@@ -100,6 +106,7 @@ class FpsCmd(object):
                                         keys.Key("maxsteps", types.Int(), 
                                                         help="Maximum step number for 2D convergence test"),                
                                         keys.Key("xml", types.String(), help="XML filename"),
+                                        keys.Key("datapath", types.String(), help="Mock data for simulation mode"),
                                         keys.Key("runDir", types.String(), help="Directory of run data"),
                                         keys.Key("startFrame", types.Int(), help="starting frame for "
                                                         "boresight calculating"),
@@ -119,10 +126,47 @@ class FpsCmd(object):
 
 
         self.cc = None
+        self.fpgaHost = None
+        self.p = None
+        self.simDataPath =None
+
+    def fpgaSim(self, cmd):
+        """Turn on/off simulalation mode of FPGA"""
+        cmdKeys = cmd.cmd.keywords
+        datapath = cmd.cmd.keywords['datapath'].values[0] if 'datapath' in cmdKeys else None
         
+        simOn = 'on' in cmdKeys
+        simOff = 'off' in cmdKeys
+
+        my_env = os.environ.copy()
+
+        if simOn is True:
+            self.fpgaHost = 'localhost'
+            self.logger.info(f'Starting a FPGA simulator.')
+            self.p=sub.Popen(['fpgaSim'], env=my_env)
+            #output, errors = self.p.communicate()
+
+            self.logger.info(f'FPGA simulator started with PID = {self.p.pid}.')
+            if datapath is None:
+                self.logger.warn(f'FPGA simulator is ON but datapath is not given.')
+            else:
+                self.simDataPath = datapath
+
+        if simOff is True:
+            self.fpgaHost = 'fpga'
+            
+            self.logger.info(f'Stopping FPGA simulator.')
+            self.simDataPath = None
+            
+            
+            os.kill(self.p.pid,signal.SIGKILL)
+            os.kill(self.p.pid+1,signal.SIGKILL)
+            
+        cmd.finish(f"text='fpgaSim command finished.'")
+
 
     def loadModel(self, cmd):
-        
+        """ Loading cobr"""
         xml = cmd.cmd.keywords['xml'].values[0]
         self.logger.info(f'Input XML file = {xml}')
         self.xml = pathlib.Path(xml)
@@ -130,11 +174,8 @@ class FpsCmd(object):
         mod = 'ALL'
         self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
         self.cc.loadModel(file=pathlib.Path(self.xml))
-        #self.cc.connect()
         eng.setCobraCoach(self.cc)
 
-        #self.cc = cc
-        #eng.setPhiMode()
         cmd.finish(f"text='Loading model = {self.xml}'")
 
 
@@ -424,9 +465,11 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         if phi is True:
+            eng.setPhiMode()
             self.cc.setPhiGeometryFromRun(runDir)
             self.logger.info(f'Using PHI geometry from {runDir}')
         else:
+            eng.setThetaMode()
             self.cc.setThetaGeometryFromRun(runDir)
             self.logger.info(f'Using THETA geometry from {runDir}')
         cmd.finish(f"text='Setting geometry is finished'")
@@ -623,12 +666,11 @@ class FpsCmd(object):
 
         self.logger.info(f'Move phi to angle = {angle}')
         
-        eng.setPhiMode()    
         # move phi to 60 degree for theta test
         dataPath, diffAngles, moves = eng.movePhiAngles(self.cc.goodIdx, np.deg2rad(angle), 
             relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)
         
-        self.logger.info(f'Data path : {datapath}')    
+        self.logger.info(f'Data path : {dataPath}')    
         cmd.finish(f'PHI is now at {angle} degress!!')
 
     
@@ -733,7 +775,34 @@ class FpsCmd(object):
             self.logger.info(f'Theta on-time optimal XML = {xml}')
             cmd.finish(f'motorOntimeSearch of theta arm is finished')
 
- 
+    def makeOntimeMap(self, cmd):
+       
+        """ Making on-time map. """
+        cmdKeys = cmd.cmd.keywords
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+        if phi is True:
+            
+            self.logger.info(f'Running phi fast on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.phiOntimeScan(speed=np.deg2rad(0.12), 
+                                            steps=10, totalSteps=6000, repeat=1, scaling=4.0)
+            
+            self.logger.info(f'Running phi slow on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.phiOntimeScan(speed=np.deg2rad(0.06), 
+                                            steps=20, totalSteps=9000, repeat=1, scaling=4.0)
+        else:
+            self.logger.info(f'Running theta fast on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.thetaOntimeScan(speed=np.deg2rad(0.12), steps=10, 
+                                    totalSteps=10000, repeat=1, scaling=3.0)
+
+            self.logger.info(f'Running theta slow on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.thetaOntimeScan(speed=np.deg2rad(0.06), steps=20, 
+                                    totalSteps=15000, repeat=1, scaling=3.0, tolerance=np.deg2rad(3.0))
+
+        cmd.finish(f'Motor on-time scan is finished.')
+
     def moveToObsTarget(self,cmd):
         """ Move cobras to the pfsDesign. """
 
