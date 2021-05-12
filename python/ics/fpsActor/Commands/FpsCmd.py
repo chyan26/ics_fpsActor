@@ -77,9 +77,10 @@ class FpsCmd(object):
             ('loadModel', '<xml>', self.loadModel),
             ('movePhiToAngle', '<angle> <iteration>', self.movePhiToAngle),
             ('moveToHome','@(phi|theta|all)', self.moveToHome),
+            ('setCobraMode','@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),            
             ('moveToObsTarget', '', self.moveToObsTarget),
-            ('gotoSafeFromPhi60','',self.gotoSafeFromPhi60),
+            ('moveToSafePosition','',self.moveToSafePosition),
             ('gotoVerticalFromPhi60','',self.gotoVerticalFromPhi60),
             ('makeMotorMap','@(phi|theta) <stepsize> <repeat> [@slowOnly]',self.makeMotorMap),
             ('makeOntimeMap','@(phi|theta)',self.makeOntimeMap),
@@ -144,7 +145,6 @@ class FpsCmd(object):
             self.fpgaHost = 'localhost'
             self.logger.info(f'Starting a FPGA simulator.')
             self.p=sub.Popen(['fpgaSim'], env=my_env)
-            #output, errors = self.p.communicate()
 
             self.logger.info(f'FPGA simulator started with PID = {self.p.pid}.')
             if datapath is None:
@@ -157,7 +157,6 @@ class FpsCmd(object):
             
             self.logger.info(f'Stopping FPGA simulator.')
             self.simDataPath = None
-            
             
             os.kill(self.p.pid,signal.SIGKILL)
             os.kill(self.p.pid+1,signal.SIGKILL)
@@ -456,6 +455,28 @@ class FpsCmd(object):
         # assumes module == 1 XXX
         return np.array(pfiControl.PFI.allocateCobraList(zip(np.full(len(cobs), 1), np.array(cobs) + 1)))
     
+    def setCobraMode(self,cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+        normal = 'normal' in cmdKeys
+
+        if phi is True:
+            eng.setPhiMode()
+            self.logger.info(f'Cobra is now in PHI mode')
+
+        if theta is True:
+            eng.setThetaMode()
+            self.logger.info(f'Cobra is now in THETA mode')
+
+        if normal is True:
+            eng.setNormalMode()
+            self.logger.info(f'Cobra is now in NORMAL mode')
+
+
+        cmd.finish(f"text='Setting corba mode is finished'")
+
 
     def setGeometry(self, cmd):
 
@@ -465,11 +486,11 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         if phi is True:
-            eng.setPhiMode()
+            #eng.setPhiMode()
             self.cc.setPhiGeometryFromRun(runDir)
             self.logger.info(f'Using PHI geometry from {runDir}')
         else:
-            eng.setThetaMode()
+            #eng.setThetaMode()
             self.cc.setThetaGeometryFromRun(runDir)
             self.logger.info(f'Using THETA geometry from {runDir}')
         cmd.finish(f"text='Setting geometry is finished'")
@@ -554,7 +575,7 @@ class FpsCmd(object):
             self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True)
 
         if allfiber is True:
-            # move to home position
+            eng.setNormalMode()
             self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
 
         cmd.finish(f'Move all arms back to home')
@@ -674,25 +695,13 @@ class FpsCmd(object):
         cmd.finish(f'PHI is now at {angle} degress!!')
 
     
-    def gotoSafeFromPhi60(self, cmd):
+    def moveToSafePosition(self, cmd):
         """ Move cobras to nominal safe position: thetas OUT, phis in.
         Assumes phi is at 60deg and that we know thetaPositions.
 
         """
-        phiAngle=60.0
-        tolerance=np.rad2deg(0.05)
-        angle = (180.0 - phiAngle) / 2.0
-        thetaAngles = np.full(len(self.allCobras), -angle, dtype='f4')
-        thetaAngles[np.arange(0,self.nCobras,2)] += 0
-        thetaAngles[np.arange(1,self.nCobras,2)] += 180
-
-        if not hasattr(self, 'thetaHomes'):
-            keepExisting = False
-        else:
-            keepExisting = True
-
-        run = self._moveToThetaAngle(cmd, None, angle=thetaAngles, tolerance=tolerance,
-                                    keepExistingPosition=keepExisting, globalAngles=True)
+        eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.2, 
+            tries=24, homed=False, newDir=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
         
         cmd.finish(f'gotoSafeFromPhi60 is finished')
 
@@ -805,9 +814,29 @@ class FpsCmd(object):
 
     def moveToObsTarget(self,cmd):
         """ Move cobras to the pfsDesign. """
+        datapath='/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/hyoshida/'
+        target_file = f'{datapath}/pfsdesign_test_20201228_command_positions.csv'
+        data=pd.read_csv(target_file)
 
-        raise NotImplementedError('moveToObsTarget')
-        cmd.finish()
+        thetaAngle = data['theta(rad)'].values
+        phiAngle = data['phi(rad)'].values
+
+        targets = np.zeros([2394, 2])
+
+        targets[:,0] = thetaAngle
+        targets[:,1] = phiAngle
+
+        positions = self.cc.pfi.anglesToPositions(self.cc.allCobras, thetaAngle, phiAngle)
+
+        dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetaAngle[self.cc.goodIdx], 
+            phiAngle[self.cc.goodIdx], relative=False, local=True, tolerance=0.2, tries=12, homed=False, 
+            newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+        
+        np.save(dataPath / 'positions', positions)
+        np.save(dataPath / 'targets', targets)
+        np.save(dataPath / 'moves', moves)
+
+        cmd.finish(f'MoveToObsTarget sequence finished')
 
 
     def getAEfromFF(self, cmd, frameId):
