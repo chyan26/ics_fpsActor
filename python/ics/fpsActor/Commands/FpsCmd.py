@@ -98,29 +98,21 @@ class FpsCmd(object):
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
                                         keys.Key("angle", types.Int(), help="arm angle"),
                                         keys.Key("stepsize", types.Int(), help="step size of motor"),
-                                        keys.Key("repeat", types.Int(), help="number of iteration for motor "
-                                                     "map generation"),
-                                        keys.Key("angleTargets", types.Int(), 
-                                                        help="Target number for angle convergence"),
-                                        keys.Key("totalTargets", types.Int(), 
-                                                        help="Target number for 2D convergence"),
-                                        keys.Key("maxsteps", types.Int(), 
-                                                        help="Maximum step number for 2D convergence test"),                
+                                        keys.Key("repeat", types.Int(), help="number of iteration for motor map generation"),
+                                        keys.Key("angleTargets", types.Int(),help="Target number for angle convergence"),
+                                        keys.Key("totalTargets", types.Int(),help="Target number for 2D convergence"),
+                                        keys.Key("maxsteps", types.Int(),help="Maximum step number for 2D convergence test"),                
                                         keys.Key("xml", types.String(), help="XML filename"),
                                         keys.Key("datapath", types.String(), help="Mock data for simulation mode"),
                                         keys.Key("runDir", types.String(), help="Directory of run data"),
-                                        keys.Key("startFrame", types.Int(), help="starting frame for "
-                                                        "boresight calculating"),
-                                        keys.Key("endFrame", types.Int(), help="ending frame for "
-                                                        "boresight calculating"),
+                                        keys.Key("startFrame", types.Int(), help="starting frame for boresight calculating"),
+                                        keys.Key("endFrame", types.Int(), help="ending frame for boresight calculating"),
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("iteration", types.Int(), help="Interation number"),
-                                        keys.Key("id", types.Long(),
-                                                 help=("fpsDesignId for the field, "
-                                                       "which defines the fiber positions")),
+                                        keys.Key("id", types.Long(),help="fpsDesignId for the field,which defines the fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
-                                        keys.Key("expTime", types.Float(), 
-                                                 help="Seconds for exposure"))
+                                        keys.Key("expTime", types.Float(),help="Seconds for exposure"),
+                                        )
 
         self.logger = logging.getLogger('fps')
         self.logger.setLevel(logging.INFO)
@@ -171,7 +163,12 @@ class FpsCmd(object):
         self.xml = pathlib.Path(xml)
 
         mod = 'ALL'
-        self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+        if self.simDataPath is not None:
+            self.cc = cobraCoach.CobraCoach('localhost', loadModel=False, 
+                simDataPath=self.simDataPath, actor=self.actor, cmd=cmd)
+        else:            
+            self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+        
         self.cc.loadModel(file=pathlib.Path(self.xml))
         eng.setCobraCoach(self.cc)
 
@@ -593,6 +590,19 @@ class FpsCmd(object):
         eng.setNormalMode()
         self.logger.info(f'Moving cobra to home position') 
         self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+
+        self.logger.info(f'Making transformation using home position') 
+        daytag = time.strftime('%Y%m%d')
+
+        # We don't need to home phi again since there is a home sequence above.
+        newXml = eng.convertXML2(f'{daytag}.xml',homePhi=False)
+
+        self.logger.info(f'Using new XML = {newXml} as default setting') 
+        self.xml=newXml
+        
+        self.cc.loadModel(file=pathlib.Path(self.xml))
+        #eng.setCobraCoach(self.cc)
+
         if ontime is True:
             
             self.logger.info(f'Run convergence test of {runs} targets with constant on-time') 
@@ -705,62 +715,6 @@ class FpsCmd(object):
         
         cmd.finish(f'gotoSafeFromPhi60 is finished')
 
-    def gotoVerticalFromPhi60(self, cmd):
-        """ Move cobras to nominal safe position: thetas OUT, phis in.
-        Assumes phi is at 60deg and that we know thetaPositions.
-
-        """
-        self._connect()
-        
-        broken = [self.pfi.calibModel.findCobraByModuleAndPositioner(1,47)+1,
-                    #self.pfi.calibModel.findCobraByModuleAndPositioner(3,25)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(4,22)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,19)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(7,5)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(14,13)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,1)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,23)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(15,55)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(17,37)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(21,10)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(22,13)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(27,38)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(28,41)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,57)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(31,14)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,1)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(34,22)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(29,41)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(33,12)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(37,1)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,15)+1,
-                    self.pfi.calibModel.findCobraByModuleAndPositioner(42,43)+1
-                    ]
-        #broken.append([189,290,447,559,589,607,809,1171,1252,1321,2033,2120,2136,2149,2163])
-        self.setBrokenCobras(brokens=broken)
-
-        phiAngle=60.0
-        tolerance=np.rad2deg(0.05)
-        angle = (180.0 - phiAngle) / 2.0
-        thetaAngles = np.full(self.nCobras, -angle, dtype='f4')
-        
-        thetaAngles[np.arange(0,799)] += 270        
-        thetaAngles[np.arange(799,1596)] += 150
-        thetaAngles[np.arange(1596,2394)] += 30
-
-        #thetaAngles[855] += 30
-
-
-        if not hasattr(self, 'thetaHomes'):
-            keepExisting = False
-        else:
-            keepExisting = True
-
-        run = self._moveToThetaAngle(cmd, None, angle=thetaAngles, tolerance=tolerance,
-                                    keepExistingPosition=keepExisting, globalAngles=True)
-        
-        cmd.finish(f'gotoVerticalFromPhi60 is finished')
-
     def motorOntimeSearch(self, cmd):
         """ FPS interface of searching the on time parameters for a specified motor speed """
         cmdKeys = cmd.cmd.keywords
@@ -774,13 +728,13 @@ class FpsCmd(object):
             day = time.strftime('%Y-%m-%d')
             newXml = f'{day}-phi_opt.xml'        
 
-            xml=self._phiOnTimeSearch(cmd, newXml, speeds=(0.06,0.12), steps=(500,250), iteration=3, repeat=1, b=0.07)
+            xml=eng.phiOnTimeSearch(cmd, newXml, speeds=(0.06,0.12), steps=(500,250), iteration=3, repeat=1, b=0.07)
             
             cmd.finish(f'motorOntimeSearch of phi arm is finished')
         else:
             day = time.strftime('%Y-%m-%d')
             newXml = f'{day}-theta_opt.xml'  
-            xml=self._thetaOnTimeSearch(cmd, newXml, speeds=[0.06,0.12], steps=[1000,500], iteration=3, repeat=1, b=0.088)
+            xml=eng.thetaOnTimeSearch(cmd, newXml, speeds=(0.06,0.12), steps=[1000,500], iteration=3, repeat=1, b=0.088)
             self.logger.info(f'Theta on-time optimal XML = {xml}')
             cmd.finish(f'motorOntimeSearch of theta arm is finished')
 
