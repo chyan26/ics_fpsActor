@@ -40,7 +40,7 @@ class NajaVenator(object):
         conn = self.conn 
         buf = io.StringIO()
 
-        cmd = f"""copy (select * from "FiberPosition" where "ftype" = 'ff') to stdout delimiter ',' """
+        cmd = f"""copy (select * from "fiducial_fiber_geometry") to stdout delimiter ',' """
 
         with conn:
             with conn.cursor() as curs:
@@ -49,10 +49,10 @@ class NajaVenator(object):
 
         # Skip the frameId, etc. columns.
         arr = np.genfromtxt(buf, dtype='f4',
-                    delimiter=',',usecols=(0,1,2,3))
+                    delimiter=',',usecols=(0,1,2))
 
 
-        d = {'fiberID': arr[:,0].astype('int32'), 'x': arr[:,2].astype('float'), 'y':arr[:,3].astype('float')}
+        d = {'fiberID': arr[:,0].astype('int32'), 'x': arr[:,1].astype('float'), 'y':arr[:,2].astype('float')}
 
         df=pd.DataFrame(data=d)
 
