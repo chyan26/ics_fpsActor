@@ -26,7 +26,7 @@ from opscore.utility.qstr import qstr
 from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
-from ics.fpsActor.utils import butler
+#from ics.fpsActor.utils import butler
 from ics.fpsActor.utils import display as vis
 reload(vis)
 
@@ -71,6 +71,7 @@ class FpsCmd(object):
             ('powerOff', '', self.powerOff),
             ('diag', '', self.diag),
             ('connect', '', self.connect),
+            ('buildTransFF','',self.buildTransFF),
             ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
@@ -171,115 +172,19 @@ class FpsCmd(object):
         self.xml = pathlib.Path(xml)
 
         mod = 'ALL'
-        self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+        
+        if self.simDataPath is None:
+            self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+        else:
+            cmd.inform(f"text='Connecting to FPGA simulator'")
+            self.cc = cobraCoach.CobraCoach(self.fpgaHost, loadModel=False, simDataPath=self.simDataPath, 
+                actor=self.actor, cmd=cmd)
+
         self.cc.loadModel(file=pathlib.Path(self.xml))
         eng.setCobraCoach(self.cc)
 
         cmd.finish(f"text='Loading model = {self.xml}'")
 
-
-    def _fpsInit(self):
-        """ Init module 1 cobras """
-
-        self.xml = None
-
-        # partition module 1 cobras into odd and even sets
-        #moduleCobras = {}
-        #for group in 1, 2:
-        #    cm = range(group, 58, 2)
-        #    mod = [1]*len(cm)
-        #    moduleCobras[group] = pfiControl.PFI.allocateCobraList(zip(mod, cm))
-        #self.oddCobras = moduleCobras[1]
-        #self.evenCobras = moduleCobras[2]
-
-
-    def _simpleConnect(self):
-        self.runManager.newRun()
-        reload(pfiControl)
-        # Initializing COBRA module
-        self.pfi = pfiControl.PFI(fpgaHost=self.fpgaHost,
-                                  doLoadModel=False,
-                                  logDir=self.runManager.logDir)
-        
-        self.modules = [f'SC{m:02d}' for m in range(1,43)]
-        self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
-        self.pfi.loadModel(self.modFiles)
-
-        if self.xml is None:
-            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/allModule.xml'))
-        else:
-            newModel = pfiDesign.PFIDesign(self.xml)
-        self.pfi.calibModel = newModel
-        
-        self.allCobras = np.array(self.pfi.getAllDefinedCobras())
-        self.nCobras = len(self.allCobras)
-        
-    def _connect(self):
-        self.runManager.newRun()
-        reload(pfiControl)
-        # Initializing COBRA module
-        self.pfi = pfiControl.PFI(fpgaHost=self.fpgaHost,
-                                  doLoadModel=False,
-                                  logDir=self.runManager.logDir)
-
-        # It takes > 10s to power down.
-        # Power on is pretty much instant, but requires a reset as well.
-        # Two resets is the same a power on and a reset.
-        if True:
-            self.pfi.diag()
-            self.pfi.power(0)
-            time.sleep(1)
-            self.pfi.reset()
-            time.sleep(1)
-            self.pfi.diag()
-        else:
-            self.pfi.power(0x3f)
-            time.sleep(1)
-            self.pfi.power(0x3f)
-            time.sleep(1)
-            self.pfi.reset()
-            time.sleep(1)
-            self.pfi.diag()
-            time.sleep(1)
-            self.pfi.power(0)
-            time.sleep(1)
-            self.pfi.power(0)
-            time.sleep(1)
-            self.pfi.reset()
-            time.sleep(1)
-            self.pfi.diag()
-            
-        self.modules = [f'SC{m:02d}' for m in range(1,43)]
-        self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
-
-        #self.pfi.loadModel(self.modFiles)
-        
-        
-        if self.xml is None:
-            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/allModule.xml'))
-        else:
-            newModel = pfiDesign.PFIDesign(self.xml)
-        
-        self.pfi.calibModel = newModel
-        self.pfi.calibModel.fixModuleIds()
-        
-        self.logger.info(f'Loading XML from {self.xml}')
-
-        self.allCobras = np.array(self.pfi.getAllDefinedCobras())
-        self.nCobras = len(self.allCobras)
-
-        self.pfi.setFreq(self.allCobras)
-
-        # initialize cameras
-        #self.cam = camera.cameraFactory(name='rmod',doClear=True, runManager=self.runManager)
-
-        # init calculation library
-        self.cal = calculation.Calculation(self.pfi.calibModel, None, None)
-
-        # define the broken/good cobras
-
-        self.setBrokenCobras(brokens=self.brokens)
-        self.logger.info(f'Setting broken fibers =  {self.brokens}')
 
     def getPositionsForFrame(self, frameId):
         mcsData = self.nv.readCentroid(frameId)
@@ -432,6 +337,12 @@ class FpsCmd(object):
            
         self.logger.info(f'{infoString}')
    
+
+    def buildTransFF(self,cmd):
+        """ Building Transformation from FF. """
+
+
+        cmd.finish(f'text="Command for building tranformation is finished."')
 
     def loadDesign(self, cmd):
         """ Load our design from the given pfsDesignId. """
