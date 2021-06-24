@@ -110,8 +110,8 @@ class NajaVenator(object):
 
         buf = io.StringIO()
         
-        cmd = f"""copy (select * from "mcsexposure"
-                where "frameid"={frameId}) to stdout delimiter ',' """
+        cmd = f"""copy (select * from "mcs_exposure"
+                where "mcs_frame_id"={frameId}) to stdout delimiter ',' """
 
         with conn:
             with conn.cursor() as curs:
@@ -121,7 +121,7 @@ class NajaVenator(object):
 
         arr = np.genfromtxt(buf, dtype='f4',
                             delimiter=',',usecols=range(7))
-        d = {'frameId': arr[1], 'alt': arr[4], 'azi': arr[5], 'instrot':arr[6]}
+        d = {'frameId': arr[0], 'alt': arr[3], 'azi': arr[4], 'instrot':arr[5]}
 
         return d
 
