@@ -4,10 +4,13 @@ import opscore.utility.sdss3logging
 import actorcore.ICC
 
 class Fps(actorcore.ICC.ICC):
-    def __init__(self, name, productName=None, debugLevel=30):
+    def __init__(self, name, productName=None, configFile=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
-        actorcore.ICC.ICC.__init__(self, name, productName=productName)
+        super().__init__(name, 
+                         productName=productName,
+                         modelNames=('gen2'),
+                         configFile=configFile)
 
         self.everConnected = False
 
@@ -27,7 +30,7 @@ class Fps(actorcore.ICC.ICC):
         return self.cmdSets['FpsCmd'].getPositionsForFrame(frameId)
 
 def main():
-    fps = Fps('fps', 'fpsActor')
+    fps = Fps('fps', productName='fpsActor')
     fps.run()
 
 if __name__ == '__main__':

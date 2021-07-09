@@ -81,7 +81,6 @@ class FpsCmd(object):
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),            
             ('moveToObsTarget', '', self.moveToObsTarget),
             ('moveToSafePosition','',self.moveToSafePosition),
-            ('gotoVerticalFromPhi60','',self.gotoVerticalFromPhi60),
             ('makeMotorMap','@(phi|theta) <stepsize> <repeat> [@slowOnly]',self.makeMotorMap),
             ('makeOntimeMap','@(phi|theta)',self.makeOntimeMap),
             ('angleConverge','@(phi|theta) <angleTargets>',self.angleConverge),
@@ -554,7 +553,7 @@ class FpsCmd(object):
                 self.logger.info(f'Running THETA FAST motor map.')
                 newXml= f'{day}-theta-final.xml'
                 #runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
-                runDir, bad = eng.makeThetaMotorMaps(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
+                runDir, bad = eng.makeThetaMotorMaps(newXml, totalSteps=10000, repeat=repeat,steps=steps,delta=delta, fast=True)
             
         cmd.finish(f'Motor map sequence finished')
     
@@ -566,14 +565,18 @@ class FpsCmd(object):
         allfiber = 'all' in cmdKeys
         
         if phi is True:
+            eng.setPhiMode()
             self.cc.moveToHome(self.cc.goodCobras, phiEnable=True)
 
         if theta is True:
+            eng.setThetaMode()
             self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True)
 
         if allfiber is True:
             eng.setNormalMode()
-            self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+            diff=self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+
+            self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}') 
 
         cmd.finish(f'Move all arms back to home')
 
@@ -728,13 +731,13 @@ class FpsCmd(object):
             day = time.strftime('%Y-%m-%d')
             newXml = f'{day}-phi_opt.xml'        
 
-            xml=eng.phiOnTimeSearch(cmd, newXml, speeds=(0.06,0.12), steps=(500,250), iteration=3, repeat=1, b=0.07)
+            xml=eng.phiOnTimeSearch(newXml, speeds=(0.06,0.12), steps=(500,250), iteration=3, repeat=1)
             
             cmd.finish(f'motorOntimeSearch of phi arm is finished')
         else:
             day = time.strftime('%Y-%m-%d')
             newXml = f'{day}-theta_opt.xml'  
-            xml=eng.thetaOnTimeSearch(cmd, newXml, speeds=(0.06,0.12), steps=[1000,500], iteration=3, repeat=1, b=0.088)
+            xml=eng.thetaOnTimeSearch(newXml, speeds=(0.06,0.12), steps=[1000,500], iteration=3, repeat=1)
             self.logger.info(f'Theta on-time optimal XML = {xml}')
             cmd.finish(f'motorOntimeSearch of theta arm is finished')
 
