@@ -1,12 +1,11 @@
 import pathlib
 import sys
 from importlib import reload
+import datetime
 
 from astropy.io import fits
 
 import numpy as np
-import psycopg2
-import io
 import pandas as pd
 import cv2
 from pfs.utils.coordinates import CoordTransp
@@ -26,7 +25,6 @@ from opscore.utility.qstr import qstr
 from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
-from ics.fpsActor.utils import butler
 from ics.fpsActor.utils import display as vis
 reload(vis)
 
@@ -45,6 +43,7 @@ from procedures.moduleTest import engineer as eng
 import subprocess as sub
 import os
 import signal
+from opdb import opdb
 
 reload(pfiControl)
 reload(cobraCoach)
@@ -57,6 +56,7 @@ class FpsCmd(object):
         self.nv = najaVenator.NajaVenator()
 
         self.tranMatrix = None
+        self._db = None
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -71,6 +71,7 @@ class FpsCmd(object):
             ('powerOff', '', self.powerOff),
             ('diag', '', self.diag),
             ('connect', '', self.connect),
+            ('buildTransMatrix', '[<frameId>]', self.buildTransMatrix),
             ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
@@ -88,9 +89,7 @@ class FpsCmd(object):
             ('targetConverge','@(ontime|speed) <totalTargets> <maxsteps>',self.targetConverge),
             ('motorOntimeSearch','@(phi|theta)',self.motorOntimeSearch),
             ('visCobraSpots','@(phi|theta) <runDir>',self.visCobraSpots),
-            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
-            ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
-            ('testLoop', '[<cnt>] [<expTime>] [<visit>]', self.testLoop),
+            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight)
         ]
 
         # Define typed command arguments for the above commands.
@@ -108,6 +107,7 @@ class FpsCmd(object):
                                         keys.Key("startFrame", types.Int(), help="starting frame for boresight calculating"),
                                         keys.Key("endFrame", types.Int(), help="ending frame for boresight calculating"),
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
+                                        keys.Key("frameId", types.Int(), help="PFS Frame ID"),
                                         keys.Key("iteration", types.Int(), help="Interation number"),
                                         keys.Key("id", types.Long(),help="fpsDesignId for the field,which defines the fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
@@ -122,6 +122,34 @@ class FpsCmd(object):
         self.fpgaHost = None
         self.p = None
         self.simDataPath =None
+
+    def connectToDB(self, cmd):
+        """connect to the database if not already connected"""
+
+        if self._db is not None:
+            return self._db
+
+        try:
+            config = self.actor.config
+            hostname = config.get('db', 'hostname')
+            dbname = config.get('db', 'dbname', fallback='opdb')
+            port = config.get('db', 'port', fallback=5432)
+            username = config.get('db', 'username', fallback='pfs')
+        except Exception as e:
+            raise RuntimeError(f'failed to load opdb configuration: {e}')
+
+        try:
+            db = opdb.OpDB(hostname, port, dbname, username, 'pfspass')
+            db.connect()
+            
+        except:
+            raise RuntimeError("unable to connect to the database")
+
+        if cmd is not None:
+            cmd.inform('text="Connected to Database"')
+
+        self._db=db
+        return self._db
 
     def fpgaSim(self, cmd):
         """Turn on/off simulalation mode of FPGA"""
@@ -163,120 +191,19 @@ class FpsCmd(object):
         self.xml = pathlib.Path(xml)
 
         mod = 'ALL'
-        if self.simDataPath is not None:
-            self.cc = cobraCoach.CobraCoach('localhost', loadModel=False, 
-                simDataPath=self.simDataPath, actor=self.actor, cmd=cmd)
-        else:            
-            self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
         
+        if self.simDataPath is None:
+            self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+        else:
+            cmd.inform(f"text='Connecting to FPGA simulator'")
+            self.cc = cobraCoach.CobraCoach(self.fpgaHost, loadModel=False, simDataPath=self.simDataPath, 
+                actor=self.actor, cmd=cmd)
+
         self.cc.loadModel(file=pathlib.Path(self.xml))
         eng.setCobraCoach(self.cc)
 
         cmd.finish(f"text='Loading model = {self.xml}'")
 
-
-    def _fpsInit(self):
-        """ Init module 1 cobras """
-
-        self.xml = None
-
-        # partition module 1 cobras into odd and even sets
-        #moduleCobras = {}
-        #for group in 1, 2:
-        #    cm = range(group, 58, 2)
-        #    mod = [1]*len(cm)
-        #    moduleCobras[group] = pfiControl.PFI.allocateCobraList(zip(mod, cm))
-        #self.oddCobras = moduleCobras[1]
-        #self.evenCobras = moduleCobras[2]
-
-
-    def _simpleConnect(self):
-        self.runManager.newRun()
-        reload(pfiControl)
-        # Initializing COBRA module
-        self.pfi = pfiControl.PFI(fpgaHost=self.fpgaHost,
-                                  doLoadModel=False,
-                                  logDir=self.runManager.logDir)
-        
-        self.modules = [f'SC{m:02d}' for m in range(1,43)]
-        self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
-        self.pfi.loadModel(self.modFiles)
-
-        if self.xml is None:
-            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/allModule.xml'))
-        else:
-            newModel = pfiDesign.PFIDesign(self.xml)
-        self.pfi.calibModel = newModel
-        
-        self.allCobras = np.array(self.pfi.getAllDefinedCobras())
-        self.nCobras = len(self.allCobras)
-        
-    def _connect(self):
-        self.runManager.newRun()
-        reload(pfiControl)
-        # Initializing COBRA module
-        self.pfi = pfiControl.PFI(fpgaHost=self.fpgaHost,
-                                  doLoadModel=False,
-                                  logDir=self.runManager.logDir)
-
-        # It takes > 10s to power down.
-        # Power on is pretty much instant, but requires a reset as well.
-        # Two resets is the same a power on and a reset.
-        if True:
-            self.pfi.diag()
-            self.pfi.power(0)
-            time.sleep(1)
-            self.pfi.reset()
-            time.sleep(1)
-            self.pfi.diag()
-        else:
-            self.pfi.power(0x3f)
-            time.sleep(1)
-            self.pfi.power(0x3f)
-            time.sleep(1)
-            self.pfi.reset()
-            time.sleep(1)
-            self.pfi.diag()
-            time.sleep(1)
-            self.pfi.power(0)
-            time.sleep(1)
-            self.pfi.power(0)
-            time.sleep(1)
-            self.pfi.reset()
-            time.sleep(1)
-            self.pfi.diag()
-            
-        self.modules = [f'SC{m:02d}' for m in range(1,43)]
-        self.modFiles = [butler.mapPathForModule(mn, version='final') for mn in self.modules]
-
-        #self.pfi.loadModel(self.modFiles)
-        
-        
-        if self.xml is None:
-            newModel = pfiDesign.PFIDesign(pathlib.Path('/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/allModule.xml'))
-        else:
-            newModel = pfiDesign.PFIDesign(self.xml)
-        
-        self.pfi.calibModel = newModel
-        self.pfi.calibModel.fixModuleIds()
-        
-        self.logger.info(f'Loading XML from {self.xml}')
-
-        self.allCobras = np.array(self.pfi.getAllDefinedCobras())
-        self.nCobras = len(self.allCobras)
-
-        self.pfi.setFreq(self.allCobras)
-
-        # initialize cameras
-        #self.cam = camera.cameraFactory(name='rmod',doClear=True, runManager=self.runManager)
-
-        # init calculation library
-        self.cal = calculation.Calculation(self.pfi.calibModel, None, None)
-
-        # define the broken/good cobras
-
-        self.setBrokenCobras(brokens=self.brokens)
-        self.logger.info(f'Setting broken fibers =  {self.brokens}')
 
     def getPositionsForFrame(self, frameId):
         mcsData = self.nv.readCentroid(frameId)
@@ -942,62 +869,68 @@ class FpsCmd(object):
         cmd.finish(f'mcsBoresight={xc:0.4f},{yc:0.4f}')
 
 
-    def testCamera(self, cmd):
-        """ Camera Loop Test. """
-
+    def buildTransMatrix(self, cmd):
+        """ Buiding transformation matrix using FF"""
         cmdKeys = cmd.cmd.keywords
-        cnt = cmdKeys["cnt"].values[0] \
-              if 'cnt' in cmdKeys \
-                 else 1
-        expTime = cmdKeys["expTime"].values[0] \
-                  if "expTime" in cmdKeys \
-                     else 1.0
-        doCentroid = 'noCentroids' not in cmdKeys
+        if 'frameId' in cmdKeys:
+            frameId = cmdKeys['frameId'].values[0]
 
-        for i in range(cnt):
-            cmd.inform(f'text="taking exposure loop {i+1}/{cnt}"')
-            visit = self._mcsExpose(cmd, expTime=expTime, doCentroid=doCentroid)
-            if not visit:
-                cmd.fail('text="exposure failed"')
-                return
-
-        cmd.finish()
-
-    def testLoop(self, cmd):
-        """ Run the expose-move loop a few times. For development. """
-
-        cmdKeys = cmd.cmd.keywords
-        visit = cmdKeys["visit"].values[0] \
-            if 'visit' in cmdKeys \
-            else None
-        cnt = cmdKeys["cnt"].values[0] \
-            if 'cnt' in cmdKeys \
-               else 7
-        expTime = cmdKeys["expTime"].values[0] \
-            if "expTime" in cmdKeys \
-            else None
-
-        for i in range(cnt):
-            frameId = 100*visit + i
-            cmd.inform(f'text="taking exposure loop {i+1}/{cnt}"')
-            frameId = self._mcsExpose(cmd, frameId, expTime=expTime, doCentroid=True)
-            if not frameId:
-                cmd.fail('text="exposure failed"')
-                return
-
-            cmd.inform('text="Exposure finished." ')
-
-            if (i == 0):
-                cmd.inform('text="Getting Affine coefficients from fiducial fibers." ')
-                self.getAEfromFF(cmd, frameId)
-            
-            cmd.inform('text="Apply Affine coefficients to science fibers." ')
-            match = self.applyAEonCobra(cmd, frameId)
-            self.nv.writeCobraConfig(match,frameId)
+        
+        self.logger.info(f'Build transformation matrix with FF on frame {frameId}')
 
 
-        cmd.finish("text='Testing loop finished.'")
+        # Use this latest matrix as initial guess for automatic calculating.
+        db=self.connectToDB(cmd)
+        sql=f'''SELECT * from mcs_pfi_transformation 
+            WHERE mcs_frame_id < {frameId} ORDER BY mcs_frame_id DESC
+            FETCH FIRST ROW ONLY
+            '''
+        transMatrix=db.fetch_query(sql)
+        scale = transMatrix['x_scale'].values[0]
+        xoffset = transMatrix['x_trans'].values[0]
+        yoffset = transMatrix['y_trans'].values[0]
+        angle = transMatrix['angle'].values[0]
+        self.logger.info(f'Latest matrix = {xoffset} {yoffset} scale = {scale}, angle={angle}')
 
+        # Loading FF from DB
+        ff_f3c=self.nv.readFFConfig()['x'].values+self.nv.readFFConfig()['y'].values*1j
+        rx, ry = fpstool.projectFCtoPixel([ff_f3c.real,ff_f3c.imag], scale, angle, [xoffset,yoffset])
+
+        # Load MCS data from DB
+        self.logger.info(f'Load frame from DB')
+        mcsData = self.nv.readCentroid(frameId)
+
+        target=np.array([rx,ry]).T.reshape((len(rx), 2))
+        source=np.array([mcsData['centroidx'].values,mcsData['centroidy'].values]).T.reshape((len(mcsData['centroidx'].values), 2))
+
+        match=fpstool.pointMatch(target, source)
+        ff_mcs=match[:,0]+match[:,1]*1j
+
+        mat = fpstool.getAffineFromFF(ff_mcs, ff_f3c)
+
+        dataInfo={'mcs_frame_id':frameId,
+          'x_trans':mat['xTrans'],
+          'y_trans':mat['yTrans'],
+          'x_scale':mat['xScale'],
+          'y_scale':mat['yScale'],
+          'angle':np.rad2deg(mat['angle']),
+          'calculated_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        self.logger.info(f"New matrix = {mat['xTrans']} {mat['yTrans']} scale = {mat['xScale']}, angle={np.rad2deg(mat['angle'])}")
+        try:
+            db.insert('mcs_pfi_transformation',pd.DataFrame(data=dataInfo,index=[0]))
+        except:
+            self.logger.info(f'Updating transformation matrix')
+            db.update('mcs_pfi_transformation',pd.DataFrame(data=dataInfo,index=[0]))
+        
+        # Building the camera model
+        self.logger.info(f"Building camera model")
+        f3c_mcs_camModel, mcs_f3c_camModel = fpstool.buildCameraModelFF(ff_mcs, ff_f3c)
+
+        cmd.finish('text="Building tranformation matrix finished"')
+
+ 
     def visCobraSpots(self, cmd):
         cmdKeys = cmd.cmd.keywords
         runDir = pathlib.Path(cmd.cmd.keywords['runDir'].values[0])
