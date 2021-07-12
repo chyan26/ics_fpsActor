@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from ics.cobraCharmer import pfiDesign
 import pathlib
 
+
 def getObjects(im, sigma=5.0):
     data = im.astype('f4')
     bkg = sep.Background(data)
@@ -17,6 +18,7 @@ def getObjects(im, sigma=5.0):
     objects = sep.extract(data_sub, thresh=thresh)
 
     return objects, data_sub, bkg
+
 
 def spots(name, sigma=5.0, doTrim=True, disp=None):
     im = fitsio.read(name)
@@ -41,8 +43,9 @@ def spots(name, sigma=5.0, doTrim=True, disp=None):
 
     return objects, imSub
 
-def visCobraSpots(runDir, xml,arm='phi'):
-    path=f'{runDir}/data/'
+
+def visCobraSpots(runDir, xml, arm='phi'):
+    path = f'{runDir}/data/'
 
     if arm is 'phi':
         centers = np.load(path + 'phiCenter.npy')
@@ -55,30 +58,30 @@ def visCobraSpots(runDir, xml,arm='phi'):
         sr = np.load(path + 'phiSpeedRV.npy')
         mf = np.load(path + 'phiMMFW.npy')
         mr = np.load(path + 'phiMMRV.npy')
-        badRange =  np.load(path + 'badRange.npy')
-        badmm =  np.load(path + 'badMotorMap.npy')
-    
-    model=pfiDesign.PFIDesign(pathlib.Path(xml))
+        badRange = np.load(path + 'badRange.npy')
+        badmm = np.load(path + 'badMotorMap.npy')
+
+    model = pfiDesign.PFIDesign(pathlib.Path(xml))
     model.fixModuleIds()
 
     from ics.cobraCharmer import func
     cobras = []
     for i in model.findAllCobras():
         c = func.Cobra(model.moduleIds[i],
-                    model.positionerIds[i])
+                       model.positionerIds[i])
         cobras.append(c)
 
     allCobras = np.array(cobras)
     nCobras = len(allCobras)
 
-    goodNums = [i+1 for i,c in enumerate(allCobras) if
-                    model.cobraIsGood(c.cobraNum, c.module)]
+    goodNums = [i+1 for i, c in enumerate(allCobras) if
+                model.cobraIsGood(c.cobraNum, c.module)]
     badNums = [e for e in range(1, nCobras+1) if e not in goodNums]
 
     goodIdx = np.array(goodNums, dtype='i4') - 1
     badIdx = np.array(badNums, dtype='i4') - 1
 
-    cobra=goodIdx
+    cobra = goodIdx
 
     plt.figure(2)
     plt.clf()
@@ -87,10 +90,9 @@ def visCobraSpots(runDir, xml,arm='phi'):
     ax = plt.gca()
     ax.axis('equal')
     for idx in cobra:
-        c = plt.Circle((centers[idx].real, centers[idx].imag), 
-            radius[idx], color='g', fill=False)
+        c = plt.Circle((centers[idx].real, centers[idx].imag),
+                       radius[idx], color='g', fill=False)
         ax.add_artist(c)
-
 
     for n in range(1):
         for k in cobra:
@@ -103,15 +105,13 @@ def visCobraSpots(runDir, xml,arm='phi'):
             else:
                 c = 'b'
                 d = 'y'
-            ax.plot(fw[k][n,0].real, fw[k][n,0].imag, c + 'o')
-            ax.plot(rv[k][n,0].real, rv[k][n,0].imag, d + 's')
-            ax.plot(fw[k][n,1:].real, fw[k][n,1:].imag, c + '.')
-            ax.plot(rv[k][n,1:].real, rv[k][n,1:].imag, d + '.')
+            ax.plot(fw[k][n, 0].real, fw[k][n, 0].imag, c + 'o')
+            ax.plot(rv[k][n, 0].real, rv[k][n, 0].imag, d + 's')
+            ax.plot(fw[k][n, 1:].real, fw[k][n, 1:].imag, c + '.')
+            ax.plot(rv[k][n, 1:].real, rv[k][n, 1:].imag, d + '.')
             ax.plot(centers[k].real, centers[k].imag, 'ro')
             #ax.text(centers[k].real, centers[k].imag,f'{k}',)
             #ax.plot(centers[k].real, centers[k].imag, 'ro')
-
-
 
     #ax.plot(phiData[382,15,:,1], phiData[382,15,:,2], 'o', color='red')
     plt.show()
