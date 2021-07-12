@@ -23,9 +23,17 @@ class NajaVenator(object):
     def conn(self):
         if self._conn is not None:
             return self._conn
+        pwpath=os.path.join(os.environ['ICS_FPSACTOR_DIR'],
+                            "etc", "dbpasswd.cfg")
 
         try:
-            connString = "dbname='opdb' user='pfs' host="+self.db
+            file = open(pwpath, "r")
+            passstring = file.read()
+        except:
+            raise RuntimeError(f"could not get db password from {pwpath}")
+
+        try:
+            connString = "dbname='opdb_asrd' user='pfs' host="+self.db+" password="+passstring
             # Skipself.actor.logger.info(f'connecting to {connString}')
             conn = psycopg2.connect(connString)
             self._conn = conn
