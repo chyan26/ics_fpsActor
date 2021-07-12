@@ -1,14 +1,22 @@
 import pathlib
 import sys
+from importlib import reload
+import datetime
+
+from astropy.io import fits
 
 import numpy as np
-import psycopg2
-import io
 import pandas as pd
 import cv2
 from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
+import pathlib
 
+from copy import deepcopy
+
+
+import logging
+import time
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 
@@ -17,11 +25,29 @@ from opscore.utility.qstr import qstr
 from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
-#import mcsActor.Visualization.mcsRoutines as mcs
-#import mcsActor.Visualization.fpsRoutines as fps
+from ics.fpsActor.utils import display as vis
+reload(vis)
 
+from procedures.moduleTest import calculation
+reload(calculation)
+from procedures.moduleTest.speedModel import SpeedModel
 
+from ics.cobraCharmer import pfi as pfiControl
+from ics.cobraCharmer import pfiDesign
+from ics.cobraCharmer.fpgaState import fpgaState
+from ics.cobraCharmer import cobraState
 
+from procedures.moduleTest import cobraCoach
+from procedures.moduleTest import engineer as eng
+
+import subprocess as sub
+import os
+import signal
+from opdb import opdb
+
+reload(pfiControl)
+reload(cobraCoach)
+    
 class FpsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -30,6 +56,7 @@ class FpsCmd(object):
         self.nv = najaVenator.NajaVenator()
 
         self.tranMatrix = None
+        self._db = None
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -38,26 +65,188 @@ class FpsCmd(object):
         self.vocab = [
             ('ping', '', self.ping),
             ('status', '', self.status),
+            ('reset', '[<mask>]', self.reset),
+            ('power', '[<mask>]', self.power),
+            ('powerOn', '', self.powerOn),
+            ('powerOff', '', self.powerOff),
+            ('diag', '', self.diag),
+            ('connect', '', self.connect),
+            ('buildTransMatrix', '[<frameId>]', self.buildTransMatrix),
+            ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
+            ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
-            ('moveToDesign', '', self.moveToDesign),
-            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
-            ('testCamera', '[<cnt>] [<expTime>] [@noCentroids]', self.testCamera),
-            ('testLoop', '[<cnt>] [<expTime>] [<visit>]', self.testLoop),
+            ('loadModel', '<xml>', self.loadModel),
+            ('movePhiToAngle', '<angle> <iteration>', self.movePhiToAngle),
+            ('moveToHome','@(phi|theta|all)', self.moveToHome),
+            ('setCobraMode','@(phi|theta|normal)', self.setCobraMode),
+            ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),            
+            ('moveToObsTarget', '', self.moveToObsTarget),
+            ('moveToSafePosition','',self.moveToSafePosition),
+            ('gotoVerticalFromPhi60','',self.gotoVerticalFromPhi60),
+            ('makeMotorMap','@(phi|theta) <stepsize> <repeat> [@slowOnly]',self.makeMotorMap),
+            ('makeOntimeMap','@(phi|theta)',self.makeOntimeMap),
+            ('angleConverge','@(phi|theta) <angleTargets>',self.angleConverge),
+            ('targetConverge','@(ontime|speed) <totalTargets> <maxsteps>',self.targetConverge),
+            ('motorOntimeSearch','@(phi|theta)',self.motorOntimeSearch),
+            ('visCobraSpots','@(phi|theta) <runDir>',self.visCobraSpots),
+            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight)
         ]
 
         # Define typed command arguments for the above commands.
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
-                                        keys.Key("startFrame", types.Int(), help="starting frame for "
-                                                        "boresight calculating"),
-                                       keys.Key("endFrame", types.Int(), help="ending frame for "
-                                                        "boresight calculating"),
+                                        keys.Key("angle", types.Int(), help="arm angle"),
+                                        keys.Key("stepsize", types.Int(), help="step size of motor"),
+                                        keys.Key("repeat", types.Int(), help="number of iteration for motor map generation"),
+                                        keys.Key("angleTargets", types.Int(),help="Target number for angle convergence"),
+                                        keys.Key("totalTargets", types.Int(),help="Target number for 2D convergence"),
+                                        keys.Key("maxsteps", types.Int(),help="Maximum step number for 2D convergence test"),                
+                                        keys.Key("xml", types.String(), help="XML filename"),
+                                        keys.Key("datapath", types.String(), help="Mock data for simulation mode"),
+                                        keys.Key("runDir", types.String(), help="Directory of run data"),
+                                        keys.Key("startFrame", types.Int(), help="starting frame for boresight calculating"),
+                                        keys.Key("endFrame", types.Int(), help="ending frame for boresight calculating"),
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
-                                        keys.Key("id", types.Long(),
-                                                 help=("fpsDesignId for the field, "
-                                                       "which defines the fiber positions")),
-                                        keys.Key("expTime", types.Float(), 
-                                                 help="Seconds for exposure"))
+                                        keys.Key("frameId", types.Int(), help="PFS Frame ID"),
+                                        keys.Key("iteration", types.Int(), help="Interation number"),
+                                        keys.Key("id", types.Long(),help="fpsDesignId for the field,which defines the fiber positions"),
+                                        keys.Key("mask", types.Int(), help="mask for power and/or reset"),
+                                        keys.Key("expTime", types.Float(),help="Seconds for exposure"),
+                                        )
+
+        self.logger = logging.getLogger('fps')
+        self.logger.setLevel(logging.INFO)
+
+
+        self.cc = None
+        self.fpgaHost = None
+        self.p = None
+        self.simDataPath =None
+
+    def connectToDB(self, cmd):
+        """connect to the database if not already connected"""
+
+        if self._db is not None:
+            return self._db
+
+        try:
+            config = self.actor.config
+            hostname = config.get('db', 'hostname')
+            dbname = config.get('db', 'dbname', fallback='opdb')
+            port = config.get('db', 'port', fallback=5432)
+            username = config.get('db', 'username', fallback='pfs')
+        except Exception as e:
+            raise RuntimeError(f'failed to load opdb configuration: {e}')
+
+        try:
+            db = opdb.OpDB(hostname, port, dbname, username, 'pfspass')
+            db.connect()
+            
+        except:
+            raise RuntimeError("unable to connect to the database")
+
+        if cmd is not None:
+            cmd.inform('text="Connected to Database"')
+
+        self._db=db
+        return self._db
+
+    def fpgaSim(self, cmd):
+        """Turn on/off simulalation mode of FPGA"""
+        cmdKeys = cmd.cmd.keywords
+        datapath = cmd.cmd.keywords['datapath'].values[0] if 'datapath' in cmdKeys else None
+        
+        simOn = 'on' in cmdKeys
+        simOff = 'off' in cmdKeys
+
+        my_env = os.environ.copy()
+
+        if simOn is True:
+            self.fpgaHost = 'localhost'
+            self.logger.info(f'Starting a FPGA simulator.')
+            self.p=sub.Popen(['fpgaSim'], env=my_env)
+
+            self.logger.info(f'FPGA simulator started with PID = {self.p.pid}.')
+            if datapath is None:
+                self.logger.warn(f'FPGA simulator is ON but datapath is not given.')
+            else:
+                self.simDataPath = datapath
+
+        if simOff is True:
+            self.fpgaHost = 'fpga'
+            
+            self.logger.info(f'Stopping FPGA simulator.')
+            self.simDataPath = None
+            
+            os.kill(self.p.pid,signal.SIGKILL)
+            os.kill(self.p.pid+1,signal.SIGKILL)
+            
+        cmd.finish(f"text='fpgaSim command finished.'")
+
+
+    def loadModel(self, cmd):
+        """ Loading cobr"""
+        xml = cmd.cmd.keywords['xml'].values[0]
+        self.logger.info(f'Input XML file = {xml}')
+        self.xml = pathlib.Path(xml)
+
+        mod = 'ALL'
+        
+        if self.simDataPath is None:
+            self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+        else:
+            cmd.inform(f"text='Connecting to FPGA simulator'")
+            self.cc = cobraCoach.CobraCoach(self.fpgaHost, loadModel=False, simDataPath=self.simDataPath, 
+                actor=self.actor, cmd=cmd)
+
+        self.cc.loadModel(file=pathlib.Path(self.xml))
+        eng.setCobraCoach(self.cc)
+
+        cmd.finish(f"text='Loading model = {self.xml}'")
+
+
+    def getPositionsForFrame(self, frameId):
+        mcsData = self.nv.readCentroid(frameId)
+        self.logger.info(f'mcs data {mcsData.shape[0]}')
+        centroids = {'x':mcsData['centroidx'].values.astype('float'),
+                     'y':mcsData['centroidy'].values.astype('float')}
+        return centroids
+
+    @staticmethod
+    def dPhiAngle(target, source, doWrap=False, doAbs=False):
+        d = np.atleast_1d(target - source)
+
+        if doAbs:
+            d[d<0] += 2*np.pi
+            d[d>=2*np.pi] -= 2*np.pi
+
+            return d
+
+        if doWrap:
+            lim = np.pi
+        else:
+            lim = 2*np.pi
+
+        # d[d > lim] -= 2*np.pi
+        d[d < -lim] += 2*np.pi
+
+        return d
+    @staticmethod
+    def _fullAngle(toPos, fromPos=None):
+        """ Return ang of vector, 0..2pi """
+        if fromPos is None:
+            fromPos = 0+0j
+        a = np.angle(toPos - fromPos)
+        if np.isscalar(a):
+            if a < 0:
+                a += 2*np.pi
+            if a >= 2*np.pi:
+                a -= 2*np.pi
+        else:
+            a[a<0] += 2*np.pi
+            a[a>=2*np.pi] -= 2*np.pi
+
+        return a
 
     def ping(self, cmd):
         """Query the actor for liveness/happiness."""
@@ -76,13 +265,97 @@ class FpsCmd(object):
         cmd.diag(sys.path)
         cmd.diag('text="FPS ready to go."')
         cmd.finish()
-
+    
     def _loadPfsDesign(self, cmd, designId):
         """ Return the pfsDesign for the given pfsDesignId. """
 
         cmd.warn(f'text="have a pfsDesignId={designId:#016x}, but do not know how to fetch it yet."')
 
         return None
+
+    def reset(self, cmd):
+        """Send the FPGA POWer command with a reset mask. """
+
+        cmdKeys = cmd.cmd.keywords
+        resetMask = cmdKeys['mask'].values[0] if 'mask' in cmdKeys else 0x3f
+        
+        self.pfi.reset(resetMask)
+        time.sleep(1)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def power(self, cmd):
+        """Send the FPGA POWer command with a sector mask. """
+
+        cmdKeys = cmd.cmd.keywords
+        powerMask = cmdKeys['mask'].values[0] if 'mask' in cmdKeys else 0x0
+        
+        self.pfi.power(powerMask)
+        time.sleep(1)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def powerOn(self, cmd):
+        """Do what is required to power on all PFI sectors. """
+
+        cmdKeys = cmd.cmd.keywords
+        
+        self.pfi.power(0x0)
+        time.sleep(1)
+        self.pfi.reset()
+        time.sleep(1)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def powerOff(self, cmd):
+        """Do what is required to power off all PFI sectors """
+
+        cmdKeys = cmd.cmd.keywords
+        
+        self.pfi.power(0x23f)
+        time.sleep(10)
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def diag(self, cmd):
+        """Read the FPGA sector inventory"""
+
+        cmdKeys = cmd.cmd.keywords
+        
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def connect(self, cmd):
+        """Connect to the FPGA and set up output tree. """
+
+        cmdKeys = cmd.cmd.keywords
+        
+        self._simpleConnect()
+        time.sleep(2)
+        
+        res = self.pfi.diag()
+        cmd.finish(f'text="diag = {res}"')
+
+    def ledlight(self, cmd):
+        """Turn on/off the fiducial fiber light"""
+        cmdKeys = cmd.cmd.keywords
+
+        light_on = 'on' in cmdKeys
+        light_off = 'off' in cmdKeys
+
+        if light_on:
+            cmdString = f'led on'
+            infoString = 'Turn on fiducial fibers'
+            
+        else:
+            cmdString = f'led off'
+            infoString = 'Turn off fiducial fibers'
+        
+        cmdVar = self.actor.cmdr.call(actor='peb', cmdStr=cmdString,
+                                       forUserCmd=cmd, timout=10)
+           
+        self.logger.info(f'{infoString}')
+   
 
     def loadDesign(self, cmd):
         """ Load our design from the given pfsDesignId. """
@@ -98,95 +371,354 @@ class FpsCmd(object):
         fpsState.fpsState.setDesign(designId, design)
         cmd.finish(f'pfsDesignId={designId:#016x}')
 
-    def moveToDesign(self,cmd):
-        """ Move cobras to the pfsDesign. """
+    def getCobras(self, cobs):
+        # cobs is 0-indexed list
+        if cobs is None:
+            cobs = np.arange(len(self.allCobras))
 
-        raise NotImplementedError('moveToDesign')
-        cmd.finish()
-
-    def _mcsExpose(self, cmd, frameId, expTime=None, doCentroid=True):
-        """ Request a single MCS exposure, with centroids by default.
-
-        Args
-        ----
-        cmd : `actorcore.Command`
-          What we report back to.
-        frameId : `int`
-          The full 8-digit frame number for the MCS
-        expTime : `float`
-          1.0s by default.
-        doCentroid : bool
-          Whether to measure centroids
-
-        Returns
-        -------
-        frameId : `int`
-          The frameId of the image. Should match `mcsData.frameId`
-
-        """
-
-        if expTime is None:
-            expTime = 1.0
-
-        cmdString = "expose object frameId=%d expTime=%0.1f %s" % (frameId, expTime,
-                                                                   'doCentroid' if doCentroid else '')
-        cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
-                                      forUserCmd=cmd, timeLim=expTime+30)
-        if cmdVar.didFail:
-            cmd.warn('text=%s' % (qstr('Failed to expose with %s' % (cmdString))))
-            return None
-
-        filekey= self.actor.models['mcs'].keyVarDict['filename'][0]
-        filename = pathlib.Path(filekey)
-        frameId = int(filename.stem[4:], base=10)
-        cmd.inform(f'frameId={frameId}')
-
-        return frameId
-
-    def _findHomes(self, baseData,poolData):
+        # assumes module == 1 XXX
+        return np.array(pfiControl.PFI.allocateCobraList(zip(np.full(len(cobs), 1), np.array(cobs) + 1)))
     
-        """
-        Do nearest neighbour matching on a set of centroids (ie, home position case).
+    def setCobraMode(self,cmd):
+        cmdKeys = cmd.cmd.keywords
 
-        """
-        dist_thres = 5.0
-        orix=[]
-        oriy=[]
-        px = []
-        py = []
-        cx = []
-        cy = []
-        fiberid = []
-        mcsid = []
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+        normal = 'normal' in cmdKeys
+
+        if phi is True:
+            eng.setPhiMode()
+            self.logger.info(f'Cobra is now in PHI mode')
+
+        if theta is True:
+            eng.setThetaMode()
+            self.logger.info(f'Cobra is now in THETA mode')
+
+        if normal is True:
+            eng.setNormalMode()
+            self.logger.info(f'Cobra is now in NORMAL mode')
+
+
+        cmd.finish(f"text='Setting corba mode is finished'")
+
+
+    def setGeometry(self, cmd):
+
+        cmdKeys = cmd.cmd.keywords
+        runDir = pathlib.Path(cmd.cmd.keywords['runDir'].values[0])
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+        if phi is True:
+            #eng.setPhiMode()
+            self.cc.setPhiGeometryFromRun(runDir)
+            self.logger.info(f'Using PHI geometry from {runDir}')
+        else:
+            #eng.setThetaMode()
+            self.cc.setThetaGeometryFromRun(runDir)
+            self.logger.info(f'Using THETA geometry from {runDir}')
+        cmd.finish(f"text='Setting geometry is finished'")
+
+    def makeMotorMap(self,cmd):
+        """ Making motor map. """
+        cmdKeys = cmd.cmd.keywords
+
+        #self._connect()
+        repeat = cmd.cmd.keywords['repeat'].values[0]
+        stepsize = cmd.cmd.keywords['stepsize'].values[0]
+
+
+        slowOnlyArg = 'slowOnly' in cmdKeys
+        if slowOnlyArg is True:
+            slowOnly = True
+        else:
+            slowOnly = False
+
+        #limitOnTime=0.08
         
-        for index, row in baseData.iterrows():
-            dist=np.sqrt((row['x']-poolData['pfix'])**2 + (row['y']-poolData['pfiy'])**2)
-            ind=pd.Series.idxmin(dist)
+        delta=0.1
+
+        # Switch from default no centroids to default do centroids
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+        #print(self.goodIdx)
+        if phi is True:
+            eng.setPhiMode()
+            steps = stepsize
+            #repeat = 3
+            day = time.strftime('%Y-%m-%d')
             
-            fiberid.append(row['fiberID'])
-            orix.append(row['x'])
-            oriy.append(row['y'])
-            if(min(dist) < dist_thres):
-                px.append(poolData['pfix'][ind])
-                py.append(poolData['pfiy'][ind])
-                cx.append(poolData['centroidx'][ind])
-                cy.append(poolData['centroidy'][ind])
-                mcsid.append(poolData['mcsId'][ind])
-                #otherwise set values to NaN
-            else:
-                px.append(np.nan)
-                py.append(np.nan)
-                cx.append(np.nan)
-                cy.append(np.nan)
-                mcsid.append(np.nan)
-        d = {'fiberId': np.array(fiberid).astype('int32'), 'mcsId': np.array(mcsid).astype('int32'), 
-            'orix': np.array(orix).astype('float'), 'oriy': np.array(oriy).astype('float'), 
-            'pfix': np.array(px).astype('float'), 'pfiy': np.array(py).astype('float'), 
-                'centroidx': np.array(cx).astype('float'), 'centroidy': np.array(cy).astype('float')}
-        match = pd.DataFrame(data=d)
-        
+            self.logger.info(f'Running PHI SLOW motor map.')
+            newXml= f'{day}-phi-slow.xml'
+            #runDir, bad = self._makePhiMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
+            runDir, bad =eng.makePhiMotorMaps(newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False)
 
-        return match
+            self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+            self.cc.pfi.loadModel([self.xml])
+            
+            if slowOnly is False:
+                self.logger.info(f'Running PHI Fast motor map.')
+                newXml= f'{day}-phi-final.xml'
+                runDir, bad = eng.makePhiMotorMaps(newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True)
+
+        else:
+            eng.setThetaMode()
+            steps = stepsize
+            #repeat = 3
+            day = time.strftime('%Y-%m-%d')
+            
+            
+            self.logger.info(f'Running THETA SLOW motor map.')
+            newXml= f'{day}-theta-slow.xml'
+            #runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
+            runDir, bad = eng.makeThetaMotorMaps(newXml, totalSteps=10000, repeat=repeat,steps=steps,delta=delta, fast=False)
+
+            self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
+            self.cc.pfi.loadModel([self.xml])
+
+            if slowOnly is False:
+                self.logger.info(f'Running THETA FAST motor map.')
+                newXml= f'{day}-theta-final.xml'
+                #runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
+                runDir, bad = eng.makeThetaMotorMaps(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
+            
+        cmd.finish(f'Motor map sequence finished')
+    
+    def moveToHome(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+        allfiber = 'all' in cmdKeys
+        
+        if phi is True:
+            self.cc.moveToHome(self.cc.goodCobras, phiEnable=True)
+
+        if theta is True:
+            self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True)
+
+        if allfiber is True:
+            eng.setNormalMode()
+            self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+
+        cmd.finish(f'Move all arms back to home')
+
+
+
+    def targetConverge(self, cmd):
+        """ Making target convergence test. """
+        cmdKeys = cmd.cmd.keywords
+        runs = cmd.cmd.keywords['totalTargets'].values[0]
+        maxsteps = cmd.cmd.keywords['maxsteps'].values[0]
+        ontime = 'ontime' in cmdKeys
+        speed = 'speed' in cmdKeys
+        
+        eng.setNormalMode()
+        self.logger.info(f'Moving cobra to home position') 
+        self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+
+        self.logger.info(f'Making transformation using home position') 
+        daytag = time.strftime('%Y%m%d')
+
+        # We don't need to home phi again since there is a home sequence above.
+        newXml = eng.convertXML2(f'{daytag}.xml',homePhi=False)
+
+        self.logger.info(f'Using new XML = {newXml} as default setting') 
+        self.xml=newXml
+        
+        self.cc.loadModel(file=pathlib.Path(self.xml))
+        #eng.setCobraCoach(self.cc)
+
+        if ontime is True:
+            
+            self.logger.info(f'Run convergence test of {runs} targets with constant on-time') 
+            self.logger.info(f'Setting max step = {maxsteps}')
+            eng.setConstantOntimeMode(maxSteps=maxsteps)
+            
+            targets, moves = eng.convergenceTest2(self.cc.goodIdx, runs=runs, thetaMargin=np.deg2rad(15.0), 
+                                phiMargin=np.deg2rad(15.0), thetaOffset=0, 
+                                phiAngle=(np.pi*5/6, np.pi/3, np.pi/4), 
+                                tries=16, tolerance=0.2, threshold=20.0, 
+                                newDir=True, twoSteps=False)
+        
+        if speed is True:
+            self.logger.info(f'Run convergence test of {runs} targets with constant speed') 
+            self.logger.info(f'Setting max step = {maxsteps}')
+
+            mmTheta = np.load('/data/MCS/20210505_016/data/thetaOntimeMap.npy')
+            mmThetaSlow =  np.load('/data/MCS/20210505_017/data/thetaOntimeMap.npy')
+            mmPhi = np.load('/data/MCS/20210506_013/data/phiOntimeMap.npy')
+            mmPhiSlow = np.load('/data/MCS/20210506_014/data/phiOntimeMap.npy')
+
+            self.logger.info(f'On-time maps loaded.')
+
+            mmTheta=self._cleanAnomaly(mmTheta)
+            mmThetaSlow=self._cleanAnomaly(mmThetaSlow)
+            mmPhi=self._cleanAnomaly(mmPhi)
+            mmPhiSlow=self._cleanAnomaly(mmPhiSlow)
+
+            eng.setConstantSpeedMaps(mmTheta, mmPhi, mmThetaSlow, mmPhiSlow)
+        
+            eng.setConstantSpeedMode(maxSegments=int({maxsteps}/100), maxSteps=100)
+
+            self.logger.info(f'Setting maxstep = 100, nSeg = {int({maxsteps}/100)}')
+            targets, moves = eng.convergenceTest2(cc.goodIdx, runs=runs, 
+                thetaMargin=np.deg2rad(15.0), phiMargin=np.deg2rad(15.0), 
+                thetaOffset=0, phiAngle=(np.pi*5/6, np.pi/3, np.pi/4), 
+                tries=16, tolerance=0.2, threshold=20.0, newDir=True, twoSteps=False)
+
+
+        cmd.finish(f'target convergece is finished')
+
+
+    def angleConverge(self, cmd):
+        """ Making comvergence test for a specific arm. """
+        cmdKeys = cmd.cmd.keywords
+        runs = cmd.cmd.keywords['angleTargets'].values[0]
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+
+        if phi is True:
+            
+            self.logger.info(f'Run phi convergence test of {runs} targets') 
+            eng.setPhiMode()
+
+            #eng.phiConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
+            cmd.finish(f'angleConverge of phi arm is finished')
+        else:
+            self.logger.info(f'Run theta convergence test of {runs} targets') 
+            eng.setThetaMode()
+            #eng.thetaConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
+            cmd.finish(f'angleConverge of theta arm is finished')
+
+ 
+    def moveToThetaAngleFromPhi60(self, cmd):
+        """ Move cobras to nominal safe position: thetas OUT, phis in.
+        Assumes phi is at 60deg and that we know thetaPositions.
+        """
+        phiAngle=60.0
+        tolerance=np.rad2deg(0.05)
+        angle = (180.0 - phiAngle) / 2.0
+        thetaAngles = np.full(len(self.allCobras), -angle, dtype='f4')
+        thetaAngles[np.arange(0,self.nCobras,2)] += 0
+        thetaAngles[np.arange(1,self.nCobras,2)] += 180
+        
+        dataPath, diffAngles, moves = eng.moveThetaAngles(cc.goodIdx, thetaAngles, 
+            relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)       
+        
+        cmd.finish(f'gotoSafeFromPhi60 is finished')
+
+    def movePhiToAngle(self, cmd):
+        """ Making comvergence test for a specific arm. """
+        cmdKeys = cmd.cmd.keywords
+        angle = cmd.cmd.keywords['angle'].values[0]
+        
+        
+        itr = cmd.cmd.keywords['iteration'].values[0]
+
+        if itr == 0:
+            itr = 8
+
+        self.logger.info(f'Move phi to angle = {angle}')
+        
+        # move phi to 60 degree for theta test
+        dataPath, diffAngles, moves = eng.movePhiAngles(self.cc.goodIdx, np.deg2rad(angle), 
+            relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)
+        
+        self.logger.info(f'Data path : {dataPath}')    
+        cmd.finish(f'PHI is now at {angle} degress!!')
+
+    
+    def moveToSafePosition(self, cmd):
+        """ Move cobras to nominal safe position: thetas OUT, phis in.
+        Assumes phi is at 60deg and that we know thetaPositions.
+
+        """
+        eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.2, 
+            tries=24, homed=False, newDir=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+        
+        cmd.finish(f'gotoSafeFromPhi60 is finished')
+
+    def motorOntimeSearch(self, cmd):
+        """ FPS interface of searching the on time parameters for a specified motor speed """
+        cmdKeys = cmd.cmd.keywords
+
+        #self._connect()
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+        if phi is True:
+            day = time.strftime('%Y-%m-%d')
+            newXml = f'{day}-phi_opt.xml'        
+
+            xml=eng.phiOnTimeSearch(cmd, newXml, speeds=(0.06,0.12), steps=(500,250), iteration=3, repeat=1, b=0.07)
+            
+            cmd.finish(f'motorOntimeSearch of phi arm is finished')
+        else:
+            day = time.strftime('%Y-%m-%d')
+            newXml = f'{day}-theta_opt.xml'  
+            xml=eng.thetaOnTimeSearch(cmd, newXml, speeds=(0.06,0.12), steps=[1000,500], iteration=3, repeat=1, b=0.088)
+            self.logger.info(f'Theta on-time optimal XML = {xml}')
+            cmd.finish(f'motorOntimeSearch of theta arm is finished')
+
+    def makeOntimeMap(self, cmd):
+       
+        """ Making on-time map. """
+        cmdKeys = cmd.cmd.keywords
+
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+        if phi is True:
+            
+            self.logger.info(f'Running phi fast on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.phiOntimeScan(speed=np.deg2rad(0.12), 
+                                            steps=10, totalSteps=6000, repeat=1, scaling=4.0)
+            
+            self.logger.info(f'Running phi slow on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.phiOntimeScan(speed=np.deg2rad(0.06), 
+                                            steps=20, totalSteps=9000, repeat=1, scaling=4.0)
+        else:
+            self.logger.info(f'Running theta fast on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.thetaOntimeScan(speed=np.deg2rad(0.12), steps=10, 
+                                    totalSteps=10000, repeat=1, scaling=3.0)
+
+            self.logger.info(f'Running theta slow on-time scan.')
+            dataPath, ontimes, angles, speeds = eng.thetaOntimeScan(speed=np.deg2rad(0.06), steps=20, 
+                                    totalSteps=15000, repeat=1, scaling=3.0, tolerance=np.deg2rad(3.0))
+
+        cmd.finish(f'Motor on-time scan is finished.')
+
+    def moveToObsTarget(self,cmd):
+        """ Move cobras to the pfsDesign. """
+        datapath='/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/hyoshida/'
+        target_file = f'{datapath}/pfsdesign_test_20201228_command_positions.csv'
+        data=pd.read_csv(target_file)
+
+        thetaAngle = data['theta(rad)'].values
+        phiAngle = data['phi(rad)'].values
+
+        targets = np.zeros([2394, 2])
+
+        targets[:,0] = thetaAngle
+        targets[:,1] = phiAngle
+
+        positions = self.cc.pfi.anglesToPositions(self.cc.allCobras, thetaAngle, phiAngle)
+
+        dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetaAngle[self.cc.goodIdx], 
+            phiAngle[self.cc.goodIdx], relative=False, local=True, tolerance=0.2, tries=12, homed=False, 
+            newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+        
+        np.save(dataPath / 'positions', positions)
+        np.save(dataPath / 'targets', targets)
+        np.save(dataPath / 'moves', moves)
+
+        cmd.finish(f'MoveToObsTarget sequence finished')
+
 
     def getAEfromFF(self, cmd, frameId):
         """ Checking distortion with fidicial fibers.  """
@@ -337,59 +869,75 @@ class FpsCmd(object):
         cmd.finish(f'mcsBoresight={xc:0.4f},{yc:0.4f}')
 
 
-    def testCamera(self, cmd):
-        """ Camera Loop Test. """
-
+    def buildTransMatrix(self, cmd):
+        """ Buiding transformation matrix using FF"""
         cmdKeys = cmd.cmd.keywords
-        cnt = cmdKeys["cnt"].values[0] \
-              if 'cnt' in cmdKeys \
-                 else 1
-        expTime = cmdKeys["expTime"].values[0] \
-                  if "expTime" in cmdKeys \
-                     else 1.0
-        doCentroid = 'noCentroids' not in cmdKeys
+        if 'frameId' in cmdKeys:
+            frameId = cmdKeys['frameId'].values[0]
 
-        for i in range(cnt):
-            cmd.inform(f'text="taking exposure loop {i+1}/{cnt}"')
-            visit = self._mcsExpose(cmd, expTime=expTime, doCentroid=doCentroid)
-            if not visit:
-                cmd.fail('text="exposure failed"')
-                return
+        
+        self.logger.info(f'Build transformation matrix with FF on frame {frameId}')
 
-        cmd.finish()
 
-    def testLoop(self, cmd):
-        """ Run the expose-move loop a few times. For development. """
+        # Use this latest matrix as initial guess for automatic calculating.
+        db=self.connectToDB(cmd)
+        sql=f'''SELECT * from mcs_pfi_transformation 
+            WHERE mcs_frame_id < {frameId} ORDER BY mcs_frame_id DESC
+            FETCH FIRST ROW ONLY
+            '''
+        transMatrix=db.fetch_query(sql)
+        scale = transMatrix['x_scale'].values[0]
+        xoffset = transMatrix['x_trans'].values[0]
+        yoffset = transMatrix['y_trans'].values[0]
+        angle = transMatrix['angle'].values[0]
+        self.logger.info(f'Latest matrix = {xoffset} {yoffset} scale = {scale}, angle={angle}')
 
+        # Loading FF from DB
+        ff_f3c=self.nv.readFFConfig()['x'].values+self.nv.readFFConfig()['y'].values*1j
+        rx, ry = fpstool.projectFCtoPixel([ff_f3c.real,ff_f3c.imag], scale, angle, [xoffset,yoffset])
+
+        # Load MCS data from DB
+        self.logger.info(f'Load frame from DB')
+        mcsData = self.nv.readCentroid(frameId)
+
+        target=np.array([rx,ry]).T.reshape((len(rx), 2))
+        source=np.array([mcsData['centroidx'].values,mcsData['centroidy'].values]).T.reshape((len(mcsData['centroidx'].values), 2))
+
+        match=fpstool.pointMatch(target, source)
+        ff_mcs=match[:,0]+match[:,1]*1j
+
+        mat = fpstool.getAffineFromFF(ff_mcs, ff_f3c)
+
+        dataInfo={'mcs_frame_id':frameId,
+          'x_trans':mat['xTrans'],
+          'y_trans':mat['yTrans'],
+          'x_scale':mat['xScale'],
+          'y_scale':mat['yScale'],
+          'angle':np.rad2deg(mat['angle']),
+          'calculated_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        self.logger.info(f"New matrix = {mat['xTrans']} {mat['yTrans']} scale = {mat['xScale']}, angle={np.rad2deg(mat['angle'])}")
+        try:
+            db.insert('mcs_pfi_transformation',pd.DataFrame(data=dataInfo,index=[0]))
+        except:
+            self.logger.info(f'Updating transformation matrix')
+            db.update('mcs_pfi_transformation',pd.DataFrame(data=dataInfo,index=[0]))
+        
+        # Building the camera model
+        self.logger.info(f"Building camera model")
+        f3c_mcs_camModel, mcs_f3c_camModel = fpstool.buildCameraModelFF(ff_mcs, ff_f3c)
+
+        cmd.finish('text="Building tranformation matrix finished"')
+
+ 
+    def visCobraSpots(self, cmd):
         cmdKeys = cmd.cmd.keywords
-        visit = cmdKeys["visit"].values[0] \
-            if 'visit' in cmdKeys \
-            else None
-        cnt = cmdKeys["cnt"].values[0] \
-            if 'cnt' in cmdKeys \
-               else 7
-        expTime = cmdKeys["expTime"].values[0] \
-            if "expTime" in cmdKeys \
-            else None
+        runDir = pathlib.Path(cmd.cmd.keywords['runDir'].values[0])
+        self.logger.info(f'Loading model = {self.xml}')
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
 
-        for i in range(cnt):
-            frameId = 100*visit + i
-            cmd.inform(f'text="taking exposure loop {i+1}/{cnt}"')
-            frameId = self._mcsExpose(cmd, frameId, expTime=expTime, doCentroid=True)
-            if not frameId:
-                cmd.fail('text="exposure failed"')
-                return
-
-            cmd.inform('text="Exposure finished." ')
-
-            if (i == 0):
-                cmd.inform('text="Getting Affine coefficients from fiducial fibers." ')
-                self.getAEfromFF(cmd, frameId)
-            
-            cmd.inform('text="Apply Affine coefficients to science fibers." ')
-            match = self.applyAEonCobra(cmd, frameId)
-            self.nv.writeCobraConfig(match,frameId)
-
-
-        cmd.finish("text='Testing loop finished.'")
-
+        if phi:        
+            vis.visCobraSpots(runDir,self.xml, arm='phi')
+        
