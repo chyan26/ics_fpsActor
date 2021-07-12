@@ -7,81 +7,84 @@ from scipy import optimize
 import math
 import cv2
 
-def getCorners(x,y):
-    
-    ds,inds=getOrientation(x,y)
-    ind=np.argsort(ds)
 
-    x0=x[inds[ind[3]]]
-    x1=x[inds[ind[2]]]
-    y0=y[inds[ind[3]]]
-    y1=y[inds[ind[2]]]
+def getCorners(x, y):
 
-    return x0,x1,y0,y1
-    
-def getOrientation(xlast,ylast):
+    ds, inds = getOrientation(x, y)
+    ind = np.argsort(ds)
 
-    
-    xm=xlast.mean()
-    ym=ylast.mean()
+    x0 = x[inds[ind[3]]]
+    x1 = x[inds[ind[2]]]
+    y0 = y[inds[ind[3]]]
+    y1 = y[inds[ind[2]]]
 
-    #find the four 'corners' by distance from the mean point
+    return x0, x1, y0, y1
 
-    #divide into quadrands
-    ind1 = np.where( np.logical_or( xlast-xm > 0, ylast-ym>0) )[0]
-    ind2 = np.where( np.logical_or( xlast-xm > 0, ylast-ym<0) )[0]
-    ind3 = np.where( np.logical_or( xlast-xm < 0, ylast-ym>0) )[0]
-    ind4 = np.where( np.logical_or( xlast-xm < 0, ylast-ym<0) )[0]
-    d1=np.sqrt((xlast[ind1]-xm)**2+(ylast[ind1]-ym)**2)
-    d2=np.sqrt((xlast[ind2]-xm)**2+(ylast[ind2]-ym)**2)
-    d3=np.sqrt((xlast[ind3]-xm)**2+(ylast[ind3]-ym)**2)
-    d4=np.sqrt((xlast[ind4]-xm)**2+(ylast[ind4]-ym)**2)
 
-    #distances for each
-    d=np.sqrt((xlast-xm)**2+(ylast-ym)**2)
-    d1=d.copy()
-    d2=d.copy()
-    d3=d.copy()
-    d4=d.copy()
+def getOrientation(xlast, ylast):
 
-    #mask irrelevant points
-    d1[ind1]=0
-    d2[ind2]=0
-    d3[ind3]=0
-    d4[ind4]=0
+    xm = xlast.mean()
+    ym = ylast.mean()
 
-    #max distance
-    dm1=d1.max()
-    dm2=d2.max()
-    dm3=d3.max()
-    dm4=d4.max()
+    # find the four 'corners' by distance from the mean point
 
-    #index thereof
-    ind1=d1.idxmax()
-    ind2=d2.idxmax()
-    ind3=d3.idxmax()
-    ind4=d4.idxmax()
+    # divide into quadrands
+    ind1 = np.where(np.logical_or(xlast-xm > 0, ylast-ym > 0))[0]
+    ind2 = np.where(np.logical_or(xlast-xm > 0, ylast-ym < 0))[0]
+    ind3 = np.where(np.logical_or(xlast-xm < 0, ylast-ym > 0))[0]
+    ind4 = np.where(np.logical_or(xlast-xm < 0, ylast-ym < 0))[0]
+    d1 = np.sqrt((xlast[ind1]-xm)**2+(ylast[ind1]-ym)**2)
+    d2 = np.sqrt((xlast[ind2]-xm)**2+(ylast[ind2]-ym)**2)
+    d3 = np.sqrt((xlast[ind3]-xm)**2+(ylast[ind3]-ym)**2)
+    d4 = np.sqrt((xlast[ind4]-xm)**2+(ylast[ind4]-ym)**2)
 
-    #now find the two largest. These will be the good corners
-    
-    ds=np.array([dm1,dm2,dm3,dm4])
-    inds=np.array([ind1,ind2,ind3,ind4])
+    # distances for each
+    d = np.sqrt((xlast-xm)**2+(ylast-ym)**2)
+    d1 = d.copy()
+    d2 = d.copy()
+    d3 = d.copy()
+    d4 = d.copy()
 
-    ind=np.argsort(ds)
+    # mask irrelevant points
+    d1[ind1] = 0
+    d2[ind2] = 0
+    d3[ind3] = 0
+    d4[ind4] = 0
 
-    #and the positions
-    x1=xlast[inds[ind[3]]]
-    y1=ylast[inds[ind[3]]]
-    x2=xlast[inds[ind[2]]]
-    y2=ylast[inds[ind[2]]]
+    # max distance
+    dm1 = d1.max()
+    dm2 = d2.max()
+    dm3 = d3.max()
+    dm4 = d4.max()
 
-    return ds,inds
+    # index thereof
+    ind1 = d1.idxmax()
+    ind2 = d2.idxmax()
+    ind3 = d3.idxmax()
+    ind4 = d4.idxmax()
 
-def calc_R(x,y, xc, yc):
+    # now find the two largest. These will be the good corners
+
+    ds = np.array([dm1, dm2, dm3, dm4])
+    inds = np.array([ind1, ind2, ind3, ind4])
+
+    ind = np.argsort(ds)
+
+    # and the positions
+    x1 = xlast[inds[ind[3]]]
+    y1 = ylast[inds[ind[3]]]
+    x2 = xlast[inds[ind[2]]]
+    y2 = ylast[inds[ind[2]]]
+
+    return ds, inds
+
+
+def calc_R(x, y, xc, yc):
     """
     calculate the distance of each 2D points from the center (xc, yc)
     """
     return np.sqrt((x-xc)**2 + (y-yc)**2)
+
 
 def f(c, x, y):
     """
@@ -91,7 +94,8 @@ def f(c, x, y):
     Ri = calc_R(x, y, *c)
     return Ri - Ri.mean()
 
-def least_squares_circle(x,y):
+
+def least_squares_circle(x, y):
     """
     Circle fit using least-squares solver.
     Inputs:
@@ -114,27 +118,28 @@ def least_squares_circle(x,y):
     x_m = np.mean(x)
     y_m = np.mean(y)
     center_estimate = x_m, y_m
-    center, ier = optimize.leastsq(f, center_estimate, args=(x,y))
+    center, ier = optimize.leastsq(f, center_estimate, args=(x, y))
     xc, yc = center
-    Ri       = calc_R(x, y, *center)
-    R        = Ri.mean()
-    residu   = np.sum((Ri - R)**2)
+    Ri = calc_R(x, y, *center)
+    R = Ri.mean()
+    residu = np.sum((Ri - R)**2)
     return xc, yc, R, residu
+
 
 def projectPixeltoFC(coord, scale, rotation, fieldCenter):
 
-    xx=(coord[0]-fieldCenter[0])/scale
-    yy=(coord[1]-fieldCenter[1])/scale
-    rx,ry=rotatePoint2([xx,yy],[fieldCenter[0]/scale,fieldCenter[1]/scale], rotation)
+    xx = (coord[0]-fieldCenter[0])/scale
+    yy = (coord[1]-fieldCenter[1])/scale
+    rx, ry = rotatePoint2([xx, yy], [fieldCenter[0]/scale, fieldCenter[1]/scale], rotation)
 
-    return rx,ry
+    return rx, ry
 
 
 def projectFCtoPixel(coord, scale, rotation, fieldCenter):
 
-    xx=(coord[0]*scale)+fieldCenter[0]
-    yy=(coord[1]*scale)+fieldCenter[1]
-    rx,ry=rotatePoint2([xx,yy],[fieldCenter[0],fieldCenter[1]], rotation)
+    xx = (coord[0]*scale)+fieldCenter[0]
+    yy = (coord[1]*scale)+fieldCenter[1]
+    rx, ry = rotatePoint2([xx, yy], [fieldCenter[0], fieldCenter[1]], rotation)
 
     return rx, ry
 
@@ -149,210 +154,208 @@ def rotatePoint2(coord, ori, angle):
 
     return xx+ori[0], yy+ori[1]
 
-def pointMatch(target, source):
 
+def pointMatch(target, source):
     """
         target: the origin position 
         source: detected source to be searched for matching, 
                 in the form of (x0, y0), (x1, y1) ....... 
-    
+
     """
-    # Looking for proper distance 
+    # Looking for proper distance
     dist_all = []
     for i in range(len(target)):
-        d=np.sqrt(np.sum((target[i]-source)**2,axis=1))
+        d = np.sqrt(np.sum((target[i]-source)**2, axis=1))
         dist_all.append(np.min(d))
 
-        #print(np.min(d))
-    dist_all=np.array(dist_all)
+        # print(np.min(d))
+    dist_all = np.array(dist_all)
     dist = np.median(dist_all)+0.1*np.std(dist_all)
 
-
-    matched=[]
+    matched = []
     for i in range(len(target)):
-        d=np.sqrt(np.sum((target[i]-source)**2,axis=1))
+        d = np.sqrt(np.sum((target[i]-source)**2, axis=1))
 
-
-        idx=np.where(d<dist)
+        idx = np.where(d < dist)
         nmatched = len(idx[0])
         if nmatched == 1:
             matched.append(source[idx[0]][0])
 
         elif nmatched > 1:
 
-            newIdx=np.where(d == np.min(d))
+            newIdx = np.where(d == np.min(d))
 
             matched.append(source[newIdx[0][0]])
         else:
-            matched.append(np.array([np.nan,np.nan]))
+            matched.append(np.array([np.nan, np.nan]))
 
-    matched=np.array(matched)
+    matched = np.array(matched)
 
-    
     return matched
 
+
 def getAffineFromFF(ff_mcs, ff_f3c):
-        
-    imgarr=[]
-    objarr=[]
+
+    imgarr = []
+    objarr = []
 
     # Building Affine Transformation
     for i in range(len(ff_mcs)):
 
         if ~np.isnan(ff_mcs[i].real):
 
-            imgarr.append([ff_f3c[i].real,ff_f3c[i].imag])
-            objarr.append([ff_mcs[i].real,ff_mcs[i].imag])
-    imgarr=np.array([imgarr])
-    objarr=np.array([objarr])
+            imgarr.append([ff_f3c[i].real, ff_f3c[i].imag])
+            objarr.append([ff_mcs[i].real, ff_mcs[i].imag])
+    imgarr = np.array([imgarr])
+    objarr = np.array([objarr])
 
-    afCoeff,inlier=cv2.estimateAffinePartial2D(imgarr, objarr)
-    mat={}
+    afCoeff, inlier = cv2.estimateAffinePartial2D(imgarr, objarr)
+    mat = {}
     mat['affineCoeff'] = afCoeff
-    mat['xTrans']=afCoeff[0,2]
-    mat['yTrans']=afCoeff[1,2]
-    mat['xScale']=np.sqrt(afCoeff[0,0]**2+afCoeff[0,1]**2)
-    mat['yScale']=np.sqrt(afCoeff[1,0]**2+afCoeff[1,1]**2)
-    mat['angle']=np.arctan2(afCoeff[1,0]/np.sqrt(afCoeff[0,0]**2+afCoeff[0,1]**2),
-                                afCoeff[1,1]/np.sqrt(afCoeff[1,0]**2+afCoeff[1,1]**2))
+    mat['xTrans'] = afCoeff[0, 2]
+    mat['yTrans'] = afCoeff[1, 2]
+    mat['xScale'] = np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2)
+    mat['yScale'] = np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2)
+    mat['angle'] = np.arctan2(afCoeff[1, 0]/np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2),
+                              afCoeff[1, 1]/np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2))
 
     return mat
 
+
 def buildCameraModelFF(ff_mcs, ff_f3c):
-    
+
     # Give the image size in (width, height)
-    imageSize= (10000, 7096)
-    
+    imageSize = (10000, 7096)
+
     # preparing two arrays for opencv operation.
-    objarr=[]
-    imgarr=[]
-    
+    objarr = []
+    imgarr = []
+
     # Re-arrange the array for CV2 convention
     for i in range(len(ff_mcs)):
 
         if ~np.isnan(ff_mcs[i].real):
 
-            imgarr.append([ff_mcs[i].real,ff_mcs[i].imag])
-            objarr.append([ff_f3c[i].real,ff_f3c[i].imag,0])
-    
-    objarr=np.array([objarr])
-    imgarr=np.array([imgarr])
+            imgarr.append([ff_mcs[i].real, ff_mcs[i].imag])
+            objarr.append([ff_f3c[i].real, ff_f3c[i].imag, 0])
+
+    objarr = np.array([objarr])
+    imgarr = np.array([imgarr])
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objarr.astype(np.float32),
-                                                       imgarr.astype(np.float32),imageSize, None, None)
-    
-    f3c_mcs_camModel = {'camMatrix':mtx, 'camDistor': dist, 'camRotVec':rvecs, 'camTranVec':tvecs}
+                                                       imgarr.astype(np.float32), imageSize, None, None)
 
-    objarr=[]
-    imgarr=[]
+    f3c_mcs_camModel = {'camMatrix': mtx, 'camDistor': dist, 'camRotVec': rvecs, 'camTranVec': tvecs}
+
+    objarr = []
+    imgarr = []
     # Re-arrange the array for CV2 convention
     for i in range(len(ff_mcs)):
 
         if ~np.isnan(ff_mcs[i].real):
 
-            imgarr.append([ff_f3c[i].real,ff_f3c[i].imag])
-            objarr.append([ff_mcs[i].real,ff_mcs[i].imag,0])
-    
-    objarr=np.array([objarr])
-    imgarr=np.array([imgarr])
+            imgarr.append([ff_f3c[i].real, ff_f3c[i].imag])
+            objarr.append([ff_mcs[i].real, ff_mcs[i].imag, 0])
+
+    objarr = np.array([objarr])
+    imgarr = np.array([imgarr])
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objarr.astype(np.float32),
-                                                       imgarr.astype(np.float32),imageSize, None, None)
+                                                       imgarr.astype(np.float32), imageSize, None, None)
 
-    mcs_f3c_camModel = {'camMatrix':mtx, 'camDistor': dist, 'camRotVec':rvecs, 'camTranVec':tvecs}
+    mcs_f3c_camModel = {'camMatrix': mtx, 'camDistor': dist, 'camRotVec': rvecs, 'camTranVec': tvecs}
 
     return f3c_mcs_camModel, mcs_f3c_camModel
 
 
 def mapF3CtoMCS(ff_mcs, ff_f3c, cobra_f3c):
     # Give the image size in (width, height)
-    imageSize= (10000, 7096)
-    
+    imageSize = (10000, 7096)
+
     # preparing two arrays for opencv operation.
-    objarr=[]
-    imgarr=[]
-    
+    objarr = []
+    imgarr = []
+
     # Re-arrange the array for CV2 convention
     for i in range(len(ff_mcs)):
 
         if ~np.isnan(ff_mcs[i].real):
 
-            imgarr.append([ff_mcs[i].real,ff_mcs[i].imag])
-            objarr.append([ff_f3c[i].real,ff_f3c[i].imag,0])
-    
-    objarr=np.array([objarr])
-    imgarr=np.array([imgarr])
+            imgarr.append([ff_mcs[i].real, ff_mcs[i].imag])
+            objarr.append([ff_f3c[i].real, ff_f3c[i].imag, 0])
+
+    objarr = np.array([objarr])
+    imgarr = np.array([imgarr])
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objarr.astype(np.float32),
-                                                       imgarr.astype(np.float32),imageSize, None, None)
-    
-    camProperty = {'camMatrix':mtx, 'camDistor': dist, 'camRotVec':rvecs, 'camTranVec':tvecs}
-    
+                                                       imgarr.astype(np.float32), imageSize, None, None)
+
+    camProperty = {'camMatrix': mtx, 'camDistor': dist, 'camRotVec': rvecs, 'camTranVec': tvecs}
+
     tot_error = 0
-    
+
     for i in range(len(objarr)):
         imgpoints2, _ = cv2.projectPoints(objarr[i].astype(np.float32), rvecs[i], tvecs[i], mtx, dist)
-        error = cv2.norm(imgarr[i].astype(np.float32),imgpoints2[:,0,:], cv2.NORM_L2)/len(imgpoints2[:,0,:])
+        error = cv2.norm(imgarr[i].astype(np.float32), imgpoints2[:, 0, :],
+                         cv2.NORM_L2)/len(imgpoints2[:, 0, :])
         tot_error = tot_error+error
 
     print("total error: ", tot_error/len(objarr))
-    
-    cobra_obj=np.array([cobra_f3c.real, cobra_f3c.imag, np.zeros(len(cobra_f3c))]).T
-    
-    imgpoints2, _ = cv2.projectPoints(cobra_obj.astype(np.float32), 
-                                  rvecs[0], tvecs[0], mtx, dist)
 
-    imgarr2=imgpoints2[:,0,:]
-    
-    output=imgarr2[:,0]+imgarr2[:,1]*1j
+    cobra_obj = np.array([cobra_f3c.real, cobra_f3c.imag, np.zeros(len(cobra_f3c))]).T
+
+    imgpoints2, _ = cv2.projectPoints(cobra_obj.astype(np.float32),
+                                      rvecs[0], tvecs[0], mtx, dist)
+
+    imgarr2 = imgpoints2[:, 0, :]
+
+    output = imgarr2[:, 0]+imgarr2[:, 1]*1j
     err = tot_error/len(objarr)
 
     return output, camProperty, err
-    
-    
+
+
 def mapMCStoF3C(ff_mcs, ff_f3c, cobra_mcs):
     # Give the image size in (width, height)
-    imageSize= (10000, 7096)
-    
+    imageSize = (10000, 7096)
+
     # preparing two arrays for opencv operation.
-    objarr=[]
-    imgarr=[]
-    
+    objarr = []
+    imgarr = []
+
     # Re-arrange the array for CV2 convention
     for i in range(len(ff_mcs)):
 
         if ~np.isnan(ff_mcs[i].real):
 
-            imgarr.append([ff_f3c[i].real,ff_f3c[i].imag])
-            objarr.append([ff_mcs[i].real,ff_mcs[i].imag,0])
-    
-    objarr=np.array([objarr])
-    imgarr=np.array([imgarr])
+            imgarr.append([ff_f3c[i].real, ff_f3c[i].imag])
+            objarr.append([ff_mcs[i].real, ff_mcs[i].imag, 0])
+
+    objarr = np.array([objarr])
+    imgarr = np.array([imgarr])
 
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(objarr.astype(np.float32),
-                                                       imgarr.astype(np.float32),imageSize, None, None)
-    
-    camProperty = {'camMatrix':mtx, 'camDistor': dist, 'camRotVec':rvecs, 'camTranVec':tvecs}
+                                                       imgarr.astype(np.float32), imageSize, None, None)
 
+    camProperty = {'camMatrix': mtx, 'camDistor': dist, 'camRotVec': rvecs, 'camTranVec': tvecs}
 
     tot_error = 0
-    
+
     for i in range(len(objarr)):
         imgpoints2, _ = cv2.projectPoints(objarr[i].astype(np.float32), rvecs[i], tvecs[i], mtx, dist)
-        error = cv2.norm(imgarr[i].astype(np.float32),imgpoints2[:,0,:], cv2.NORM_L2)/len(imgpoints2[:,0,:])
+        error = cv2.norm(imgarr[i].astype(np.float32), imgpoints2[:, 0, :],
+                         cv2.NORM_L2)/len(imgpoints2[:, 0, :])
         tot_error = tot_error+error
 
     print("total error: ", tot_error/len(objarr))
-    
-    cobra_obj=np.array([cobra_mcs.real,cobra_mcs.imag,np.zeros(len(cobra_mcs))]).T
-    
-    
-    imgpoints2, _ = cv2.projectPoints(cobra_obj.astype(np.float32), 
-                                  rvecs[0], tvecs[0], mtx, dist)
 
-    imgarr2=imgpoints2[:,0,:]
-    output=imgarr2[:,0]+imgarr2[:,1]*1j
+    cobra_obj = np.array([cobra_mcs.real, cobra_mcs.imag, np.zeros(len(cobra_mcs))]).T
+
+    imgpoints2, _ = cv2.projectPoints(cobra_obj.astype(np.float32),
+                                      rvecs[0], tvecs[0], mtx, dist)
+
+    imgarr2 = imgpoints2[:, 0, :]
+    output = imgarr2[:, 0]+imgarr2[:, 1]*1j
     err = tot_error/len(objarr)
 
     return output, camProperty, err
-
