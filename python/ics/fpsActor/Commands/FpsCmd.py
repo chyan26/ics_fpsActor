@@ -4,14 +4,11 @@ import os
 import subprocess as sub
 from procedures.moduleTest import engineer as eng
 from procedures.moduleTest import cobraCoach
-from ics.cobraCharmer import cobraState
-from ics.cobraCharmer.fpgaState import fpgaState
-from ics.cobraCharmer import pfiDesign
 from ics.cobraCharmer import pfi as pfiControl
-from procedures.moduleTest.speedModel import SpeedModel
 from procedures.moduleTest import calculation
 import pathlib
 import sys
+import threading
 from importlib import reload
 import datetime
 
@@ -41,11 +38,9 @@ from ics.fpsActor.utils import display as vis
 reload(vis)
 
 reload(calculation)
-
-
 reload(pfiControl)
 reload(cobraCoach)
-
+reload(najaVenator)
 
 class FpsCmd(object):
     def __init__(self, actor):
@@ -511,12 +506,10 @@ class FpsCmd(object):
         if phi is True:
             eng.setPhiMode()
             steps = stepsize
-            #repeat = 3
             day = time.strftime('%Y-%m-%d')
 
             self.logger.info(f'Running PHI SLOW motor map.')
             newXml = f'{day}-phi-slow.xml'
-            #runDir, bad = self._makePhiMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
             runDir, bad = eng.makePhiMotorMaps(
                 newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False)
 
