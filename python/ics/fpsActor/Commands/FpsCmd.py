@@ -284,9 +284,9 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
         resetMask = cmdKeys['mask'].values[0] if 'mask' in cmdKeys else 0x3f
 
-        self.pfi.reset(resetMask)
+        self.cc.pfi.reset(resetMask)
         time.sleep(1)
-        res = self.pfi.diag()
+        res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
     def power(self, cmd):
@@ -295,9 +295,9 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
         powerMask = cmdKeys['mask'].values[0] if 'mask' in cmdKeys else 0x0
 
-        self.pfi.power(powerMask)
+        self.cc.pfi.power(powerMask)
         time.sleep(1)
-        res = self.pfi.diag()
+        res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
     def powerOn(self, cmd):
@@ -305,11 +305,11 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
 
-        self.pfi.power(0x0)
+        self.cc.pfi.power(0x0)
         time.sleep(1)
-        self.pfi.reset()
+        self.cc.pfi.reset()
         time.sleep(1)
-        res = self.pfi.diag()
+        res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
     def powerOff(self, cmd):
@@ -317,9 +317,9 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
 
-        self.pfi.power(0x23f)
+        self.cc.pfi.power(0x23f)
         time.sleep(10)
-        res = self.pfi.diag()
+        res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
     def diag(self, cmd):
@@ -327,7 +327,7 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
 
-        res = self.pfi.diag()
+        res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
     def connect(self, cmd):
@@ -338,7 +338,7 @@ class FpsCmd(object):
         self._simpleConnect()
         time.sleep(2)
 
-        res = self.pfi.diag()
+        res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
     def ledlight(self, cmd):
