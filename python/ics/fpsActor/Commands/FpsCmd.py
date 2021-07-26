@@ -428,6 +428,7 @@ class FpsCmd(object):
         # self._connect()
         repeat = cmd.cmd.keywords['repeat'].values[0]
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         slowOnlyArg = 'slowOnly' in cmdKeys
         if slowOnlyArg is True:
@@ -492,6 +493,8 @@ class FpsCmd(object):
     def moveToHome(self, cmd):
         cmdKeys = cmd.cmd.keywords
 
+        self.actor.visitor.setOrGetVisit(cmd)
+
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         allfiber = 'all' in cmdKeys
@@ -519,6 +522,8 @@ class FpsCmd(object):
         maxsteps = cmd.cmd.keywords['maxsteps'].values[0]
         ontime = 'ontime' in cmdKeys
         speed = 'speed' in cmdKeys
+
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         eng.setNormalMode()
         self.logger.info(f'Moving cobra to home position')
@@ -580,6 +585,7 @@ class FpsCmd(object):
         """ Making comvergence test for a specific arm. """
         cmdKeys = cmd.cmd.keywords
         runs = cmd.cmd.keywords['angleTargets'].values[0]
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
@@ -601,6 +607,9 @@ class FpsCmd(object):
         """ Move cobras to nominal safe position: thetas OUT, phis in.
         Assumes phi is at 60deg and that we know thetaPositions.
         """
+        cmdKeys = cmd.cmd.keywords
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+
         phiAngle = 60.0
         tolerance = np.rad2deg(0.05)
         angle = (180.0 - phiAngle) / 2.0
@@ -617,8 +626,8 @@ class FpsCmd(object):
         """ Making comvergence test for a specific arm. """
         cmdKeys = cmd.cmd.keywords
         angle = cmd.cmd.keywords['angle'].values[0]
-
         itr = cmd.cmd.keywords['iteration'].values[0]
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         if itr == 0:
             itr = 8
@@ -637,6 +646,7 @@ class FpsCmd(object):
         Assumes phi is at 60deg and that we know thetaPositions.
 
         """
+        visit = self.actor.visitor.setOrGetVisit(cmd)
         eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.2,
                                tries=24, homed=False, newDir=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
 
@@ -645,6 +655,7 @@ class FpsCmd(object):
     def motorOntimeSearch(self, cmd):
         """ FPS interface of searching the on time parameters for a specified motor speed """
         cmdKeys = cmd.cmd.keywords
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         # self._connect()
 
@@ -668,6 +679,7 @@ class FpsCmd(object):
     def makeOntimeMap(self, cmd):
         """ Making on-time map. """
         cmdKeys = cmd.cmd.keywords
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
@@ -694,6 +706,8 @@ class FpsCmd(object):
 
     def moveToObsTarget(self, cmd):
         """ Move cobras to the pfsDesign. """
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+
         datapath = '/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/hyoshida/'
         target_file = f'{datapath}/pfsdesign_test_20201228_command_positions.csv'
         data = pd.read_csv(target_file)
