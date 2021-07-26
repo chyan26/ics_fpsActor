@@ -69,6 +69,7 @@ class FpsCmd(object):
             ('powerOn', '', self.powerOn),
             ('powerOff', '', self.powerOff),
             ('diag', '', self.diag),
+            ('hk', '[<board>] [@short]', self.hk),
             ('connect', '', self.connect),
             ('buildTransMatrix', '[<frameId>]', self.buildTransMatrix),
             ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
@@ -88,7 +89,12 @@ class FpsCmd(object):
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps>', self.targetConverge),
             ('motorOntimeSearch', '@(phi|theta)', self.motorOntimeSearch),
             ('visCobraSpots', '@(phi|theta) <runDir>', self.visCobraSpots),
-            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight)
+            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
+            #
+            ('testCamera', '[<visit>]', self.testCamera),
+            ('testIteration', '[<visit>]', self.testIteration),
+            ('cobraMoveSteps', '[<phi>] [<theta>]', self.cobraMoveSteps),
+            ('cobraMoveAngles', '[<phi>] [<theta>]', self.cobraMoveAngles),
         ]
 
         # Define typed command arguments for the above commands.
@@ -119,6 +125,9 @@ class FpsCmd(object):
                                             "id", types.Long(), help="fpsDesignId for the field,which defines the fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
                                         keys.Key("expTime", types.Float(), help="Seconds for exposure"),
+                                        keys.Key("theta", types.Float(), help="Distance to move theta"),
+                                        keys.Key("phi", types.Float(), help="Distance to move phi"),
+                                        keys.Key("board", types.Int(), help="board index 1-84"),
                                         )
 
         self.logger = logging.getLogger('fps')
@@ -299,6 +308,23 @@ class FpsCmd(object):
         res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
+    def hk(self, cmd):
+        """Fetch FPGA HouseKeeing info for a board or entire PFI. """
+
+        cmdKeys = cmd.cmd.keywords
+        boards = [cmdKeys['board'].values[0]] if 'board' in cmdKeys else range(1,85)
+        short = 'short' in cmdKeys
+
+        for b in boards:
+            ret = self.cc.pfi.boardHk(b)
+            error, t1, t2, v, f1, c1, f2, c2 = ret
+            cmd.inform(f'text="board {b} error={error} temps=({t1:0.2f}, {t2:0.2f}) voltage={v:0.3f}"')
+            if not short:
+                for cobraId in range(len(f1)):
+                    cmd.inform(f'text="    {cobraId+1:2d}  {f1[cobraId]:0.2f} {c1[cobraId]:0.2f}    '
+                               f'{f2[cobraId]:0.2f} {c2[cobraId]:0.2f}"')
+        cmd.finish()
+
     def powerOn(self, cmd):
         """Do what is required to power on all PFI sectors. """
 
@@ -328,6 +354,9 @@ class FpsCmd(object):
 
         res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
+
+    def disconnect(self, cmd):
+        pass
 
     def connect(self, cmd):
         """Connect to the FPGA and set up output tree. """
@@ -419,6 +448,41 @@ class FpsCmd(object):
             self.cc.setThetaGeometryFromRun(runDir)
             self.logger.info(f'Using THETA geometry from {runDir}')
         cmd.finish(f"text='Setting geometry is finished'")
+
+    def testCamera(self, cmd):
+        """Test camera and non-motion data: we do not provide target data or request match table """
+
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+        frameNum = self.getNextFrameNum()
+        cmd.inform(f'text="frame={frameNum}"')
+        ret = self.actor.cmdr.call(actor='mcs',
+                                   cmdStr=f'expose object expTime=1.0 frameId={frameNum} noCentroid',
+                                   forUserCmd=cmd, timeLim=30)
+        if ret.didFail:
+            raise RuntimeError("mcs expose failed")
+
+        cmd.finish(f'text="camera ping={ret}"')
+
+    def testIteration(self, cmd):
+        """Test camera and all non-motion data: we provide target table data """
+
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+        frameNum = self.getNextFrameNum()
+        cmd.inform(f'text="frame={frameNum} from {threading.current_thread()}"')
+
+        self.cc.exposeAndExtractPositions()
+
+        cmd.finish(f'text="visit={visit}"')
+
+    def cobraMoveSteps(self, cmd):
+        """Move single cobra in steps. """
+
+        cmd.fail('text="cobraMoveSteps not implemented"')
+
+    def cobraMoveAngles(self, cmd):
+        """Move single cobra in angles. """
+
+        cmd.fail('text="cobraMoveAngles not implemented"')
 
     def makeMotorMap(self, cmd):
         """ Making motor map. """
