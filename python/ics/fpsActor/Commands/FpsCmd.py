@@ -125,7 +125,7 @@ class FpsCmd(object):
         self.logger.setLevel(logging.INFO)
 
         self.cc = None
-        self.fpgaHost = None
+        self.fpgaHost = 'fpga'
         self.p = None
         self.simDataPath = None
 
@@ -196,17 +196,17 @@ class FpsCmd(object):
 
         mod = 'ALL'
 
+        cmd.inform(f"text='Connecting to %s FPGA'" % ('real' if self.fpgaHost == 'fpga' else 'simulator'))
         if self.simDataPath is None:
-            self.cc = cobraCoach.CobraCoach('fpga', loadModel=False, actor=self.actor, cmd=cmd)
+            self.cc = cobraCoach.CobraCoach(self.fpgaHost, loadModel=False, actor=self.actor, cmd=cmd)
         else:
-            cmd.inform(f"text='Connecting to FPGA simulator'")
             self.cc = cobraCoach.CobraCoach(self.fpgaHost, loadModel=False, simDataPath=self.simDataPath,
                                             actor=self.actor, cmd=cmd)
 
         self.cc.loadModel(file=pathlib.Path(self.xml))
         eng.setCobraCoach(self.cc)
 
-        cmd.finish(f"text='Loading model = {self.xml}'")
+        cmd.finish(f"text='Loaded model = {self.xml}'")
 
     def getPositionsForFrame(self, frameId):
         mcsData = self.nv.readCentroid(frameId)
