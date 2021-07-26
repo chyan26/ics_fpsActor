@@ -40,7 +40,7 @@ class NajaVenator(object):
             raise RuntimeError(f"could not get db password from {pwpath}")
 
         try:
-            connString = "dbname='opdb_asrd' user='pfs' host="+self.db+" password="+passstring
+            connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
             # Skipself.actor.logger.info(f'connecting to {connString}')
             conn = psycopg2.connect(connString)
             self._conn = conn
