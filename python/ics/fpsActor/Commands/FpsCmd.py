@@ -145,9 +145,8 @@ class FpsCmd(object):
             raise RuntimeError(f'failed to load opdb configuration: {e}')
 
         try:
-            db = opdb.OpDB(hostname, port, dbname, username, 'pfspass')
+            db = opdb.OpDB(hostname, port, dbname, username)
             db.connect()
-
         except:
             raise RuntimeError("unable to connect to the database")
 
