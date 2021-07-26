@@ -178,8 +178,7 @@ class FpsCmd(object):
             self.logger.info(f'FPGA simulator started with PID = {self.p.pid}.')
             if datapath is None:
                 self.logger.warn(f'FPGA simulator is ON but datapath is not given.')
-            else:
-                self.simDataPath = datapath
+            self.simDataPath = datapath
 
         if simOff is True:
             self.fpgaHost = 'fpga'
@@ -462,12 +461,11 @@ class FpsCmd(object):
         """Test camera and all non-motion data: we provide target table data """
 
         visit = self.actor.visitor.setOrGetVisit(cmd)
-        frameNum = self.getNextFrameNum()
-        cmd.inform(f'text="frame={frameNum} from {threading.current_thread()}"')
+        cmd.inform(f'text="taking frame {visit}00 and measuring centroids."')
 
-        self.cc.exposeAndExtractPositions()
+        pos = self.cc.exposeAndExtractPositions()
 
-        cmd.finish(f'text="visit={visit}"')
+        cmd.finish(f'text="visit={visit}, found {len(pos)} spots"')
 
     def cobraMoveSteps(self, cmd):
         """Move single cobra in steps. """

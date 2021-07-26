@@ -121,11 +121,9 @@ class NajaVenator(object):
 
     def readCentroid(self, frameId):
         """ Read centroid information from database. This requires INSTRM-1110."""
-        conn = self._dbconn
+        conn = self._dbConn
 
         sql = f"""select * from mcs_data where mcs_frame_id={frameId}"""
-        logging.info(f"readCentroid with {cmd}")
-
         df = conn.bulkSelect('mcs_data', sql)
 
         # We got a full table, with original names. Trim and rename to
@@ -135,7 +133,7 @@ class NajaVenator(object):
                        mcs_center_x_pix='centroidx',
                        mcs_center_y_pix='centroidy')
         df = df[renames.keys()]
-        df.rename(renames, inplace=True)
+        df.rename(columns=renames, inplace=True)
         return df
 
     def readTelescopeInform(self, frameId):

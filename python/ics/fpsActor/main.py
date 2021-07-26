@@ -54,6 +54,8 @@ class Fps(actorcore.ICC.ICC):
 
         self.everConnected = False
 
+        self._db = None
+
     def connectionMade(self):
         if self.everConnected is False:
             self.everConnected = True
