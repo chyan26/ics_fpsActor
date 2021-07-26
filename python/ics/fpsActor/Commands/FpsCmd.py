@@ -392,17 +392,17 @@ class FpsCmd(object):
 
         if phi is True:
             eng.setPhiMode()
-            self.logger.info(f'Cobra is now in PHI mode')
+            self.logger.info(f'text="Cobra is now in PHI mode"')
 
         if theta is True:
             eng.setThetaMode()
-            self.logger.info(f'Cobra is now in THETA mode')
+            self.logger.info(f'text="Cobra is now in THETA mode"')
 
         if normal is True:
             eng.setNormalMode()
-            self.logger.info(f'Cobra is now in NORMAL mode')
+            self.logger.info(f'text="Cobra is now in NORMAL mode"')
 
-        cmd.finish(f"text='Setting corba mode is finished'")
+        cmd.finish(f"text='Setting cobra mode is finished'")
 
     def setGeometry(self, cmd):
 
@@ -513,7 +513,7 @@ class FpsCmd(object):
 
             self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
 
-        cmd.finish(f'Move all arms back to home')
+        cmd.finish(f'text="Moved all arms back to home"')
 
     def targetConverge(self, cmd):
         """ Making target convergence test. """
@@ -591,17 +591,16 @@ class FpsCmd(object):
         theta = 'theta' in cmdKeys
 
         if phi is True:
-
             self.logger.info(f'Run phi convergence test of {runs} targets')
             eng.setPhiMode()
 
             #eng.phiConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
-            cmd.finish(f'angleConverge of phi arm is finished')
+            cmd.finish(f'text="angleConverge of phi arm is finished"')
         else:
             self.logger.info(f'Run theta convergence test of {runs} targets')
             eng.setThetaMode()
             #eng.thetaConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
-            cmd.finish(f'angleConverge of theta arm is finished')
+            cmd.finish(f'text="angleConverge of theta arm is finished"')
 
     def moveToThetaAngleFromPhi60(self, cmd):
         """ Move cobras to nominal safe position: thetas OUT, phis in.
@@ -620,7 +619,7 @@ class FpsCmd(object):
         dataPath, diffAngles, moves = eng.moveThetaAngles(cc.goodIdx, thetaAngles,
                                                           relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)
 
-        cmd.finish(f'gotoSafeFromPhi60 is finished')
+        cmd.finish(f'text="gotoSafeFromPhi60 is finished"')
 
     def movePhiToAngle(self, cmd):
         """ Making comvergence test for a specific arm. """
@@ -636,10 +635,11 @@ class FpsCmd(object):
 
         # move phi to 60 degree for theta test
         dataPath, diffAngles, moves = eng.movePhiAngles(self.cc.goodIdx, np.deg2rad(angle),
-                                                        relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)
+                                                        relative=False, local=True, tolerance=0.002,
+                                                        tries=itr, fast=False, newDir=True)
 
         self.logger.info(f'Data path : {dataPath}')
-        cmd.finish(f'PHI is now at {angle} degress!!')
+        cmd.finish(f'text="PHI is now at {angle} degrees!"')
 
     def moveToSafePosition(self, cmd):
         """ Move cobras to nominal safe position: thetas OUT, phis in.
@@ -650,7 +650,7 @@ class FpsCmd(object):
         eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.2,
                                tries=24, homed=False, newDir=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
 
-        cmd.finish(f'gotoSafeFromPhi60 is finished')
+        cmd.finish(f'text="gotoSafeFromPhi60 is finished"')
 
     def motorOntimeSearch(self, cmd):
         """ FPS interface of searching the on time parameters for a specified motor speed """
@@ -668,13 +668,13 @@ class FpsCmd(object):
 
             xml = eng.phiOnTimeSearch(newXml, speeds=(0.06, 0.12), steps=(500, 250), iteration=3, repeat=1)
 
-            cmd.finish(f'motorOntimeSearch of phi arm is finished')
+            cmd.finish(f'text="motorOntimeSearch of phi arm is finished"')
         else:
             day = time.strftime('%Y-%m-%d')
             newXml = f'{day}-theta_opt.xml'
             xml = eng.thetaOnTimeSearch(newXml, speeds=(0.06, 0.12), steps=[1000, 500], iteration=3, repeat=1)
             self.logger.info(f'Theta on-time optimal XML = {xml}')
-            cmd.finish(f'motorOntimeSearch of theta arm is finished')
+            cmd.finish(f'text="motorOntimeSearch of theta arm is finished"')
 
     def makeOntimeMap(self, cmd):
         """ Making on-time map. """
@@ -702,7 +702,7 @@ class FpsCmd(object):
             dataPath, ontimes, angles, speeds = eng.thetaOntimeScan(speed=np.deg2rad(0.06), steps=20,
                                                                     totalSteps=15000, repeat=1, scaling=3.0, tolerance=np.deg2rad(3.0))
 
-        cmd.finish(f'Motor on-time scan is finished.')
+        cmd.finish(f'text="Motor on-time scan is finished."')
 
     def moveToObsTarget(self, cmd):
         """ Move cobras to the pfsDesign. """
@@ -730,7 +730,7 @@ class FpsCmd(object):
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
 
-        cmd.finish(f'MoveToObsTarget sequence finished')
+        cmd.finish(f'text="MoveToObsTarget sequence finished"')
 
     def getAEfromFF(self, cmd, frameId):
         """ Checking distortion with fidicial fibers.  """
