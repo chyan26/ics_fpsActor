@@ -1,12 +1,16 @@
+from importlib import reload
 
 import io
 import os
+import logging
 import numpy as np
 import pandas as pd
 import psycopg2
 import time
 import datetime
 
+from opdb import opdb
+reload(opdb)
 
 class NajaVenator(object):
     """ 
@@ -19,6 +23,8 @@ class NajaVenator(object):
 
         self.db = 'db-ics'
         self._conn = None
+
+        self._dbConn = opdb.OpDB(hostname='db-ics', dbname='opdb', username='pfs')
 
     @property
     def conn(self):
@@ -34,7 +40,7 @@ class NajaVenator(object):
             raise RuntimeError(f"could not get db password from {pwpath}")
 
         try:
-            connString = "dbname='opdb_asrd' user='pfs' host="+self.db+" password="+passstring
+            connString = "dbname='opdb' user='pfs' host="+self.db+" password="+passstring
             # Skipself.actor.logger.info(f'connecting to {connString}')
             conn = psycopg2.connect(connString)
             self._conn = conn
@@ -91,7 +97,7 @@ class NajaVenator(object):
 
         return df
 
-    def readCentroid(self, frameId):
+    def readCentroidOld(self, frameId):
         """ Read centroid information from databse"""
         conn = self.conn
 
@@ -111,6 +117,23 @@ class NajaVenator(object):
 
         df = pd.DataFrame(data=arr)
 
+        return df
+
+    def readCentroid(self, frameId):
+        """ Read centroid information from database. This requires INSTRM-1110."""
+        conn = self._dbConn
+
+        sql = f"""select * from mcs_data where mcs_frame_id={frameId}"""
+        df = conn.bulkSelect('mcs_data', sql)
+
+        # We got a full table, with original names. Trim and rename to
+        # what is expected here.
+        renames = dict(mcs_frame_id='mcsId',
+                       spot_id='fiberId',
+                       mcs_center_x_pix='centroidx',
+                       mcs_center_y_pix='centroidy')
+        df = df[renames.keys()]
+        df.rename(columns=renames, inplace=True)
         return df
 
     def readTelescopeInform(self, frameId):
