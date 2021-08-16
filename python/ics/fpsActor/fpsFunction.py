@@ -155,7 +155,7 @@ def rotatePoint2(coord, ori, angle):
     return xx+ori[0], yy+ori[1]
 
 
-def pointMatch(target, source):
+def pointMatch(target, source, scale=None):
     """
         target: the origin position 
         source: detected source to be searched for matching, 
@@ -170,7 +170,11 @@ def pointMatch(target, source):
 
         # print(np.min(d))
     dist_all = np.array(dist_all)
-    dist = np.median(dist_all)+0.1*np.std(dist_all)
+    if scale is None:
+        scale = 0.5
+    dist = np.median(dist_all)+scale*np.std(dist_all)
+
+
 
     matched = []
     for i in range(len(target)):
