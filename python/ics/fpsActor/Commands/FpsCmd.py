@@ -5,6 +5,7 @@ import subprocess as sub
 from procedures.moduleTest import engineer as eng
 from procedures.moduleTest import cobraCoach
 from ics.cobraCharmer import pfi as pfiControl
+import ics.cobraCharmer.pfiDesign as pfiDesign
 from procedures.moduleTest import calculation
 import pathlib
 import sys
@@ -41,7 +42,7 @@ reload(calculation)
 reload(pfiControl)
 reload(cobraCoach)
 reload(najaVenator)
-
+reload(eng)
 class FpsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -71,6 +72,7 @@ class FpsCmd(object):
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
+            ('cobraAndDotRecenter', '', self.cobraAndDotRecenter),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
             ('moveToHome', '@(phi|theta|all [<visit>])', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
@@ -84,7 +86,7 @@ class FpsCmd(object):
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
             ('motorOntimeSearch', '@(phi|theta) [<visit>]', self.motorOntimeSearch),
             ('visCobraSpots', '@(phi|theta) <runDir>', self.visCobraSpots),
-            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
+            ('calculateBoresight', '', self.calculateBoresight),
             #
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>]', self.testIteration),
@@ -447,7 +449,7 @@ class FpsCmd(object):
         """Test camera and non-motion data: we do not provide target data or request match table """
 
         visit = self.actor.visitor.setOrGetVisit(cmd)
-        frameNum = self.getNextFrameNum()
+        frameNum = self.actor.visitor.getNextFrameNum()
         cmd.inform(f'text="frame={frameNum}"')
         ret = self.actor.cmdr.call(actor='mcs',
                                    cmdStr=f'expose object expTime=1.0 frameId={frameNum} noCentroid',
@@ -568,6 +570,72 @@ class FpsCmd(object):
             self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
 
         cmd.finish(f'text="Moved all arms back to home"')
+
+    def cobraAndDotRecenter(self, cmd):
+        """
+            Making a new XML using home position instead of rotational center
+        """
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+        
+
+        daytag = time.strftime('%Y%m%d')
+        newXml = eng.convertXML2(f'recenter_{daytag}.xml', homePhi=False)
+        
+        self.logger.info(f'Using new XML = {newXml} as default setting')
+        self.xml = newXml
+        
+    
+
+        self.cc.calibModel = pfiDesign.PFIDesign(pathlib.Path(self.xml))
+        cmd.inform(f'text="Loading new XML file= {newXml}"')
+
+
+        self.logger.info(f'Loading conversion matrix for {self.cc.frameNum}')
+        frameNum = self.cc.frameNum
+        # Use this latest matrix as initial guess for automatic calculating.
+        db = self.connectToDB(cmd)
+        sql = f'''SELECT * from mcs_pfi_transformation 
+            WHERE mcs_frame_id < {frameNum} ORDER BY mcs_frame_id DESC
+            FETCH FIRST ROW ONLY
+            '''
+        transMatrix = db.fetch_query(sql)
+        scale = transMatrix['x_scale'].values[0]
+        xoffset = transMatrix['x_trans'].values[0]
+        yoffset = transMatrix['y_trans'].values[0]
+        # Always 
+        angle = -transMatrix['angle'].values[0]
+        self.logger.info(f'Latest matrix = {xoffset} {yoffset} scale = {scale}, angle={angle}')
+
+        # Loading FF from DB
+        ff_f3c = self.nv.readFFConfig()['x'].values+self.nv.readFFConfig()['y'].values*1j
+        rx, ry = fpstool.projectFCtoPixel([ff_f3c.real, ff_f3c.imag], scale, angle, [xoffset, yoffset])
+
+        # Load MCS data from DB
+        self.logger.info(f'Load frame from DB')
+        mcsData = self.nv.readCentroid(frameNum)
+
+        target = np.array([rx, ry]).T.reshape((len(rx), 2))
+        source = np.array([mcsData['centroidx'].values, mcsData['centroidy'].values]
+                          ).T.reshape((len(mcsData['centroidx'].values), 2))
+
+        match = fpstool.pointMatch(target, source)
+        ff_mcs = match[:, 0]+match[:, 1]*1j
+
+        self.logger.info(f'Mapping DOT location using latest affine matrix')
+        
+        #afCoeff = cal.tranformAffine(ffpos, ff_mcs)
+        ori=np.array([np.array([self.cc.calibModel.ffpos.real,self.cc.calibModel.ffpos.imag]).T])
+        tar=np.array([np.array([ff_mcs.real,ff_mcs.imag]).T])
+        #self.logger.info(f'{ori}')
+        #self.logger.info(f'{tar}')
+        afCoeff,inlier=cv2.estimateAffinePartial2D(np.array(ori), np.array(tar))
+
+        afCor=cv2.transform(np.array(
+                [np.array([self.cc.calibModel.dotpos.real,self.cc.calibModel.dotpos.imag]).T]),afCoeff)
+        newDotPos=afCor[0]
+        self.cc.calibModel.ffpos=newDotPos[:,0]+newDotPos[:,1]*1j
+
+        cmd.finish(f'text="New XML file {newXml} is generated."')
 
     def targetConverge(self, cmd):
         """ Making target convergence test. """
@@ -895,36 +963,68 @@ class FpsCmd(object):
 
     def calculateBoresight(self, cmd):
         """ Function for calculating the rotation center """
-        cmdKeys = cmd.cmd.keywords
+        #cmdKeys = cmd.cmd.keywords
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+        frameNum = self.actor.visitor.getNextFrameNum()
+        cmd.inform(f'text="frame={frameNum}"')
+        ret = self.actor.cmdr.call(actor='mcs',
+                                   cmdStr=f'expose object expTime=0.5 frameId={frameNum} doCentroid',
+                                   forUserCmd=cmd, timeLim=30)
+        if ret.didFail:
+            raise RuntimeError("mcs expose failed")
 
-        startFrame = cmdKeys["startFrame"].values[0]
-        endFrame = cmdKeys["endFrame"].values[0]
+        self.logger.info(f'Starting build matrix with FF on {frameNum}')
+        
+        # Use this latest matrix as initial guess for automatic calculating.
+        db = self.connectToDB(cmd)
+        sql = f'''SELECT * from mcs_pfi_transformation 
+            WHERE mcs_frame_id < {frameNum} ORDER BY mcs_frame_id DESC
+            FETCH FIRST ROW ONLY
+            '''
+        transMatrix = db.fetch_query(sql)
+        scale = transMatrix['x_scale'].values[0]
+        xoffset = transMatrix['x_trans'].values[0]
+        yoffset = transMatrix['y_trans'].values[0]
+        # Always 
+        angle = -transMatrix['angle'].values[0]
+        self.logger.info(f'Latest matrix = {xoffset} {yoffset} scale = {scale}, angle={angle}')
 
-        nframes = endFrame - startFrame + 1
-        frameid = (np.arange(nframes)+startFrame)
+        # Loading FF from DB
+        ff_f3c = self.nv.readFFConfig()['x'].values+self.nv.readFFConfig()['y'].values*1j
+        rx, ry = fpstool.projectFCtoPixel([ff_f3c.real, ff_f3c.imag], scale, angle, [xoffset, yoffset])
 
-        xCorner = []
-        yCorner = []
+        # Load MCS data from DB
+        self.logger.info(f'Load frame from DB')
+        mcsData = self.nv.readCentroid(frameNum)
 
-        for i in frameid:
-            mcsData = self.nv.readCentroid(i, 1)
-            x = mcsData['centroidx']
-            y = mcsData['centroidy']
+        target = np.array([rx, ry]).T.reshape((len(rx), 2))
+        source = np.array([mcsData['centroidx'].values, mcsData['centroidy'].values]
+                          ).T.reshape((len(mcsData['centroidx'].values), 2))
 
-            x0, x1, y0, y1 = fpstool.getCorners(x, y)
-            xCorner.append(x0)
-            yCorner.append(y0)
+        match = fpstool.pointMatch(target, source)
+        ff_mcs = match[:, 0]+match[:, 1]*1j
 
-        xCorner = np.array(xCorner)
-        yCorner = np.array(yCorner)
+        mat = fpstool.getAffineFromFF(ff_mcs, ff_f3c)
 
-        coords = [xCorner, yCorner]
-        xc, yc, r, _ = fpstool.least_squares_circle(xCorner, yCorner)
+        dataInfo = {'mcs_frame_id': frameNum,
+                    'x_trans': mat['xTrans'],
+                    'y_trans': mat['yTrans'],
+                    'x_scale': mat['xScale'],
+                    'y_scale': mat['yScale'],
+                    'angle': np.rad2deg(mat['angle']),
+                    'calculated_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    }
 
-        data = {'visitid': startFrame, 'xc': xc, 'yc': yc}
+        self.logger.info(
+            f"New matrix = {mat['xTrans']:04f} {mat['yTrans']:0.4f} scale = {mat['xScale']:0.2f}, angle={np.rad2deg(mat['angle']):0.2f}")
+        try:
+            db.insert('mcs_pfi_transformation', pd.DataFrame(data=dataInfo, index=[0]))
+        except:
+            self.logger.info(f'Updating transformation matrix')
+            db.update('mcs_pfi_transformation', pd.DataFrame(data=dataInfo, index=[0]))
 
-        self.nv.writeBoresightTable(data)
-
+        xc = mat['xTrans']
+        yc = mat['yTrans']
         cmd.finish(f'mcsBoresight={xc:0.4f},{yc:0.4f}')
 
     def buildTransMatrix(self, cmd):
