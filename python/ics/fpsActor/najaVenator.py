@@ -55,7 +55,7 @@ class NajaVenator(object):
         conn = self.conn
         buf = io.StringIO()
 
-        cmd = f"""copy (select * from "fiducial_fiber_geometry") to stdout delimiter ',' """
+        cmd = f"""copy (select * from "fiducial_fiber_geometry" where fiducial_fiber_calib_id = 1) to stdout delimiter ',' """
 
         with conn:
             with conn.cursor() as curs:
