@@ -1,12 +1,14 @@
 import numpy as np
-from astropy.io.fits import getdata
+import astropy.io.fits as pyfits
 
 from scipy.stats import sigmaclip
 import numpy.ma as ma
 from scipy import optimize
 import math
 import cv2
-
+import pandas as pd
+from ics.cobraCharmer.utils import butler
+import cmath
 
 def getCorners(x, y):
 
@@ -154,6 +156,61 @@ def rotatePoint2(coord, ori, angle):
 
     return xx+ori[0], yy+ori[1]
 
+def alignDotOnImage(runDir):
+    arm = 'phi'
+
+    fits= f'{runDir}/data/{arm}ForwardStack0.fits'
+    f =pyfits.open(fits)
+    data=f[1].data
+
+
+    ffDotDF=pd.read_csv(butler.configPathForFFDot())
+    dotDF = pd.read_csv(butler.configPathForDot())
+    import sep
+    std = np.std(data)
+
+    objects = sep.extract(data.astype('float'),
+                                thresh=1200,
+                                filter_type='conv', clean=False,
+                                deblend_cont=1.0)
+    obj=pd.DataFrame(objects)
+
+    target=np.array([ffDotDF['x_pixel'].values,ffDotDF['y_pixel'].values]).T
+    source=np.array([obj['x'].values,obj['y'].values]).T.reshape((len(obj['x'].values), 2))
+
+    ff_mcs=pointMatch(target, source,scale=2)
+
+    afCoeff,inlier=cv2.estimateAffinePartial2D(target, ff_mcs)
+    afCor=cv2.transform(np.array([np.array((dotDF['x_dot'].values,dotDF['y_dot'].values)).T]),afCoeff)
+    newDotPos=afCor[0]
+    newDot = newDotPos[:,0]+newDotPos[:,1]*1j
+
+    return newDot, dotDF['r_dot'].values
+
+def checkPhiOpenAngle(centers, radius, fw, dotpos, dotradii, angleList, verbose=False):
+    
+    L1radii=[]
+    blockIdx = []
+    for cobraIdx in range(len(centers)):
+        angle = angleList[cobraIdx]
+        
+        # first Calculate the point 60 degree away from HS
+        angleAtOpen = (np.deg2rad(angle) + np.angle(fw[cobraIdx,0,0]-centers[cobraIdx]))
+        pointAtOpen = cmath.rect(radius[cobraIdx],angleAtOpen)+centers[cobraIdx] 
+        L1temp =  np.abs(pointAtOpen - fw[cobraIdx,0,0])
+        distDot = np.abs(dotpos[cobraIdx] - fw[cobraIdx,0,0])
+        L1radii.append(L1temp)
+        diff = np.abs(L1temp - distDot)
+
+        if diff < dotradii[cobraIdx]:
+            if verbose:
+                print(f'{cobraIdx} affected by dot. L1temp={L1temp} DotDist={distDot}')
+            blockIdx.append(cobraIdx)
+            
+    L1radii=np.array(L1radii)
+    
+    return L1radii, blockIdx
+
 
 def pointMatch(target, source, scale=None):
     """
@@ -166,7 +223,8 @@ def pointMatch(target, source, scale=None):
     dist_all = []
     for i in range(len(target)):
         d = np.sqrt(np.sum((target[i]-source)**2, axis=1))
-        dist_all.append(np.min(d))
+        if ~np.isnan(np.min(d)):
+            dist_all.append(np.min(d))
 
         # print(np.min(d))
     dist_all = np.array(dist_all)
