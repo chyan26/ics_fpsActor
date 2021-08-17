@@ -73,6 +73,7 @@ class FpsCmd(object):
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
             ('cobraAndDotRecenter', '', self.cobraAndDotRecenter),
+            ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
             ('moveToHome', '@(phi|theta|all [<visit>])', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
@@ -633,7 +634,7 @@ class FpsCmd(object):
         afCor=cv2.transform(np.array(
                 [np.array([self.cc.calibModel.dotpos.real,self.cc.calibModel.dotpos.imag]).T]),afCoeff)
         newDotPos=afCor[0]
-        self.cc.calibModel.ffpos=newDotPos[:,0]+newDotPos[:,1]*1j
+        self.cc.calibModel.dotpos=newDotPos[:,0]+newDotPos[:,1]*1j
 
         cmd.finish(f'text="New XML file {newXml} is generated."')
 
@@ -696,7 +697,7 @@ class FpsCmd(object):
             eng.setConstantSpeedMode(maxSegments=int({maxsteps}/100), maxSteps=100)
 
             self.logger.info(f'Setting maxstep = 100, nSeg = {int({maxsteps}/100)}')
-            targets, moves = eng.convergenceTest2(cc.goodIdx, runs=runs,
+            targets, moves = eng.convergenceTest2(self.cc.goodIdx, runs=runs,
                                                   thetaMargin=np.deg2rad(15.0), phiMargin=np.deg2rad(15.0),
                                                   thetaOffset=0, phiAngle=(np.pi*5/6, np.pi/3, np.pi/4),
                                                   tries=16, tolerance=0.2, threshold=20.0, newDir=True, twoSteps=False)
@@ -716,7 +717,7 @@ class FpsCmd(object):
             self.logger.info(f'Run phi convergence test of {runs} targets')
             eng.setPhiMode()
 
-            #eng.phiConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
+            eng.phiConvergenceTest(self.cc.goodIdx, runs=runs, tries=12, fast=False, tolerance=0.1)
             cmd.finish(f'text="angleConverge of phi arm is finished"')
         else:
             self.logger.info(f'Run theta convergence test of {runs} targets')
@@ -738,10 +739,49 @@ class FpsCmd(object):
         thetaAngles[np.arange(0, self.nCobras, 2)] += 0
         thetaAngles[np.arange(1, self.nCobras, 2)] += 180
 
-        dataPath, diffAngles, moves = eng.moveThetaAngles(cc.goodIdx, thetaAngles,
+        dataPath, diffAngles, moves = eng.moveThetaAngles(self.cc.goodIdx, thetaAngles,
                                                           relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)
 
         cmd.finish(f'text="gotoSafeFromPhi60 is finished"')
+
+
+    def movePhiForThetaOps(self,cmd):
+        """ Move PHI to a certain angle to avoid DOT for theta MM. """
+        bigAngle, smallAngle = 75, 30
+        cmdKeys = cmd.cmd.keywords
+        runDir = pathlib.Path(cmd.cmd.keywords['runDir'].values[0])
+        
+        newDot, rDot =fpstool.alignDotOnImage(runDir)
+
+        arm = 'phi'
+        centers = np.load(f'{runDir}/data/{arm}Center.npy')
+        radius = np.load(f'{runDir}/data/{arm}Radius.npy')
+        fw = np.load(f'{runDir}/data/{arm}FW.npy')
+
+        self.logger.info(f'Total cobra arms = {self.cc.nCobras}, try angle {bigAngle}')
+        angleList = np.zeros(self.cc.nCobras)+bigAngle
+        L1, blockId=fpstool.checkPhiOpenAngle(centers, radius,fw, newDot, rDot, angleList)
+        
+        self.logger.info(f'Total {len(blockId)} arms are blocked by DOT, try abgle = {smallAngle} ')        
+        
+        angleList[blockId]=30
+        L1, blockId=fpstool.checkPhiOpenAngle(centers,radius,fw, newDot, rDot, angleList)
+        self.logger.info(f'Total {len(blockId)} arms are blocked by DOT')        
+        
+        
+        self.logger.info(f'Move phi to requested angle')
+
+        # move phi to 60 degree for theta test
+        dataPath, diffAngles, moves = eng.movePhiAngles(self.cc.goodIdx, np.deg2rad(angleList[self.cc.goodIdx]),
+                                                        relative=False, local=True, tolerance=0.002,
+                                                        tries=12, fast=False, newDir=True)
+
+        self.logger.info(f'Data path : {dataPath}')
+        
+        np.save(f'{runDir}/output/phiOpenAngle',angleList)
+
+        cmd.finish(f'text="PHI is opened at requested angle for theta MM operation!"')
+
 
     def movePhiToAngle(self, cmd):
         """ Making comvergence test for a specific arm. """
