@@ -156,8 +156,10 @@ def rotatePoint2(coord, ori, angle):
 
     return xx+ori[0], yy+ori[1]
 
-def alignDotOnImage(runDir):
-    arm = 'phi'
+def alignDotOnImage(runDir, arm=None):
+    
+    if arm is None:
+        arm = 'phi'
 
     fits= f'{runDir}/data/{arm}ForwardStack0.fits'
     f =pyfits.open(fits)
@@ -184,8 +186,9 @@ def alignDotOnImage(runDir):
     afCor=cv2.transform(np.array([np.array((dotDF['x_dot'].values,dotDF['y_dot'].values)).T]),afCoeff)
     newDotPos=afCor[0]
     newDot = newDotPos[:,0]+newDotPos[:,1]*1j
+    newFFpos = ff_mcs[:,0]+ff_mcs[:,1]*1j
 
-    return newDot, dotDF['r_dot'].values
+    return newDot, dotDF['r_dot'].values, newFFpos
 
 def checkPhiOpenAngle(centers, radius, fw, dotpos, dotradii, angleList, verbose=False):
     
