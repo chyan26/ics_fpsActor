@@ -172,7 +172,7 @@ def alignDotOnImage(runDir, arm=None):
     std = np.std(data)
 
     objects = sep.extract(data.astype('float'),
-                                thresh=1200,
+                                thresh=1000,
                                 filter_type='conv', clean=False,
                                 deblend_cont=1.0)
     obj=pd.DataFrame(objects)
@@ -180,7 +180,7 @@ def alignDotOnImage(runDir, arm=None):
     target=np.array([ffDotDF['x_pixel'].values,ffDotDF['y_pixel'].values]).T
     source=np.array([obj['x'].values,obj['y'].values]).T.reshape((len(obj['x'].values), 2))
 
-    ff_mcs=pointMatch(target, source,scale=2)
+    ff_mcs=pointMatch(target, source,scale=0.5)
 
     afCoeff,inlier=cv2.estimateAffinePartial2D(target, ff_mcs)
     afCor=cv2.transform(np.array([np.array((dotDF['x_dot'].values,dotDF['y_dot'].values)).T]),afCoeff)
