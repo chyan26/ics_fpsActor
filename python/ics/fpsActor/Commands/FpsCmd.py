@@ -81,7 +81,7 @@ class FpsCmd(object):
             ('moveToObsTarget', '[<visit>]', self.moveToObsTarget),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             # ('gotoVerticalFromPhi60', '[<visit>]', self.gotoVerticalFromPhi60),
-            ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly @forceMove [<visit>]]', self.makeMotorMap),
+            ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
             ('makeOntimeMap', '@(phi|theta) [<visit>]', self.makeOntimeMap),
             ('angleConverge', '@(phi|theta) <angleTargets> [<visit>]', self.angleConverge),
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
