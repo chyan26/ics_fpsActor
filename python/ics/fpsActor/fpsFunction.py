@@ -167,7 +167,7 @@ def alignDotOnImage(runDir, arm=None):
 
 
     ffDotDF=pd.read_csv(butler.configPathForFFDot())
-    dotDF = pd.read_csv(butler.configPathForDot())
+    dotDF = pd.read_csv(butler.configPathForDot(version='mcs'))
     import sep
     std = np.std(data)
 
