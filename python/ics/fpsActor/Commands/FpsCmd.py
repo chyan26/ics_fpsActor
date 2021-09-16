@@ -81,7 +81,7 @@ class FpsCmd(object):
             ('moveToObsTarget', '[<visit>]', self.moveToObsTarget),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             # ('gotoVerticalFromPhi60', '[<visit>]', self.gotoVerticalFromPhi60),
-            ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly [<visit>]]', self.makeMotorMap),
+            ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly @forceMove [<visit>]]', self.makeMotorMap),
             ('makeOntimeMap', '@(phi|theta) [<visit>]', self.makeOntimeMap),
             ('angleConverge', '@(phi|theta) <angleTargets> [<visit>]', self.angleConverge),
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
@@ -489,6 +489,12 @@ class FpsCmd(object):
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
+        forceMoveArg = 'forceMove' in cmdKeys
+        if forceMoveArg is True:
+            forceMove = True
+        else:
+            forceMove  = False
+
         slowOnlyArg = 'slowOnly' in cmdKeys
         if slowOnlyArg is True:
             slowOnly = True
@@ -512,7 +518,7 @@ class FpsCmd(object):
             self.logger.info(f'Running PHI SLOW motor map.')
             newXml = f'{day}-phi-slow.xml'
             runDir, bad = eng.makePhiMotorMaps(
-                newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False)
+                newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False, force=forceMove)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -521,19 +527,17 @@ class FpsCmd(object):
                 self.logger.info(f'Running PHI Fast motor map.')
                 newXml = f'{day}-phi-final.xml'
                 runDir, bad = eng.makePhiMotorMaps(
-                    newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True)
+                    newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True, force=forceMove)
 
         else:
             eng.setThetaMode()
             steps = stepsize
-            #repeat = 3
             day = time.strftime('%Y-%m-%d')
 
             self.logger.info(f'Running THETA SLOW motor map.')
             newXml = f'{day}-theta-slow.xml'
-            #runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=False)
             runDir, bad = eng.makeThetaMotorMaps(
-                newXml, totalSteps=10000, repeat=repeat, steps=steps, delta=delta, fast=False)
+                newXml, totalSteps=10000, repeat=repeat, steps=steps, delta=delta, fast=False, force=forceMove)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -541,9 +545,8 @@ class FpsCmd(object):
             if slowOnly is False:
                 self.logger.info(f'Running THETA FAST motor map.')
                 newXml = f'{day}-theta-final.xml'
-                #runDir, bad = self._makeThetaMotorMap(cmd, newXml, repeat=repeat,steps=steps,delta=delta, fast=True)
                 runDir, bad = eng.makeThetaMotorMaps(
-                    newXml, repeat=repeat, steps=steps, delta=delta, fast=True)
+                    newXml, repeat=repeat, steps=steps, delta=delta, fast=True, force=forceMove)
 
         cmd.finish(f'Motor map sequence finished')
 
