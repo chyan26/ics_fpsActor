@@ -90,7 +90,8 @@ class FpsCmd(object):
             ('calculateBoresight', '', self.calculateBoresight),
             #
             ('testCamera', '[<visit>]', self.testCamera),
-            ('testIteration', '[<visit>]', self.testIteration),
+            ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
+            ('testLoop', '[<visit>] [<expTime>] [<cnt>]', self.testIteration), # Historical alias.
             ('cobraMoveSteps', '[<phi>] [<theta>]', self.cobraMoveSteps),
             ('cobraMoveAngles', '[<phi>] [<theta>]', self.cobraMoveAngles),
         ]
@@ -123,6 +124,7 @@ class FpsCmd(object):
                                             "id", types.Long(), help="fpsDesignId for the field,which defines the fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
                                         keys.Key("expTime", types.Float(), help="Seconds for exposure"),
+                                        keys.Key("cnt", types.Int(), help="number of iterations"),
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
                                         keys.Key("phi", types.Float(), help="Distance to move phi"),
                                         keys.Key("board", types.Int(), help="board index 1-84"),
@@ -463,12 +465,23 @@ class FpsCmd(object):
     def testIteration(self, cmd):
         """Test camera and all non-motion data: we provide target table data """
 
+        cmdKeys = cmd.cmd.keywords
         visit = self.actor.visitor.setOrGetVisit(cmd)
-        cmd.inform(f'text="taking frame {visit}00 and measuring centroids."')
 
-        pos = self.cc.exposeAndExtractPositions()
+        cnt = cmdKeys["cnt"].values[0] \
+              if 'cnt' in cmdKeys \
+                 else 1
+        expTime = cmdKeys["expTime"].values[0] \
+                  if "expTime" in cmdKeys \
+                     else None
 
-        cmd.finish(f'text="visit={visit}, found {len(pos)} spots"')
+        for i in range(cnt):
+            frameSeq = self.actor.visitor.frameSeq
+            cmd.inform(f'text="taking frame {frameSeq} ({i+1}/{cnt}) and measuring centroids."')
+            pos = self.cc.exposeAndExtractPositions(exptime=expTime)
+            cmd.inform(f'text="found {len(pos)} spots in {frameSeq} "')
+
+        cmd.finish()
 
     def cobraMoveSteps(self, cmd):
         """Move single cobra in steps. """
