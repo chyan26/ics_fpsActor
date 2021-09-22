@@ -46,7 +46,7 @@ reload(pfiControl)
 reload(cobraCoach)
 reload(najaVenator)
 reload(eng)
-
+reload(pfsDesign)
 
 class FpsCmd(object):
     def __init__(self, actor):
