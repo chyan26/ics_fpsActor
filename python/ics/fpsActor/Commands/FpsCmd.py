@@ -43,6 +43,8 @@ reload(pfiControl)
 reload(cobraCoach)
 reload(najaVenator)
 reload(eng)
+
+
 class FpsCmd(object):
     def __init__(self, actor):
         # This lets us access the rest of the actor.
@@ -72,6 +74,7 @@ class FpsCmd(object):
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
+            ('cobraMoveThetaAngles', '<stepsize>', self.cobraMoveThetaAngles),
             ('cobraAndDotRecenter', '', self.cobraAndDotRecenter),
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
@@ -92,8 +95,8 @@ class FpsCmd(object):
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
             ('testLoop', '[<visit>] [<expTime>] [<cnt>]', self.testIteration), # Historical alias.
-            ('cobraMoveSteps', '[<phi>] [<theta>]', self.cobraMoveSteps),
-            ('cobraMoveAngles', '[<phi>] [<theta>]', self.cobraMoveAngles),
+            ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps)
+            #('cobraMoveAngles', '[<phi>] [<theta>]', self.cobraMoveAngles),
         ]
 
         # Define typed command arguments for the above commands.
@@ -124,7 +127,6 @@ class FpsCmd(object):
                                             "id", types.Long(), help="fpsDesignId for the field,which defines the fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
                                         keys.Key("expTime", types.Float(), help="Seconds for exposure"),
-                                        keys.Key("cnt", types.Int(), help="number of iterations"),
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
                                         keys.Key("phi", types.Float(), help="Distance to move phi"),
                                         keys.Key("board", types.Int(), help="board index 1-84"),
@@ -439,13 +441,21 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         if phi is True:
-            # eng.setPhiMode()
+            eng.setPhiMode()
             self.cc.setPhiGeometryFromRun(runDir)
             self.logger.info(f'Using PHI geometry from {runDir}')
         else:
-            # eng.setThetaMode()
-            self.cc.setThetaGeometryFromRun(runDir)
-            self.logger.info(f'Using THETA geometry from {runDir}')
+            eng.setThetaMode()
+
+            center = np.load('/data/MCS/20210918_013/data/theta_center.npy')
+            ccwHome = np.load('/data/MCS/20210918_013/data/ccwHome.npy')
+            cwHome = np.load('/data/MCS/20210918_013/data/cwHome.npy')
+
+            self.cc.setThetaGeometry(center, ccwHome, cwHome, angle=0)
+            self.logger.info(f'Using THETA geometry from preset data')
+
+            #self.cc.setThetaGeometryFromRun(runDir)
+            #self.logger.info(f'Using THETA geometry from {runDir}')
         cmd.finish(f"text='Setting geometry is finished'")
 
     def testCamera(self, cmd):
@@ -485,13 +495,31 @@ class FpsCmd(object):
 
     def cobraMoveSteps(self, cmd):
         """Move single cobra in steps. """
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        cmd.fail('text="cobraMoveSteps not implemented"')
+        # Switch from default no centroids to default do centroids
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
 
-    def cobraMoveAngles(self, cmd):
-        """Move single cobra in angles. """
 
-        cmd.fail('text="cobraMoveAngles not implemented"')
+        cobras = self.cc.allCobras
+
+        cmdKeys = cmd.cmd.keywords
+        stepsize = cmd.cmd.keywords['stepsize'].values[0]
+
+        thetaSteps = np.zeros(len(cobras))
+        phiSteps = np.zeros(len(cobra))
+
+        if theta is True:
+            self.logger.info(f'theta arm is activated, moving {stepsize} steps')
+            thetaSteps = thetaSteps+stepsize
+        else:
+            self.logger.info(f'phi arm is activated, moving {stepsize} steps')
+            phiSteps = phiSteps+stepsize
+
+        self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps)
+
+        cmd.finish('text="cobraMoveSteps completed"')
 
     def makeMotorMap(self, cmd):
         """ Making motor map. """
@@ -737,26 +765,34 @@ class FpsCmd(object):
             cmd.finish(f'text="angleConverge of phi arm is finished"')
         else:
             self.logger.info(f'Run theta convergence test of {runs} targets')
-            eng.setThetaMode()
-            #eng.thetaConvergenceTest(self.cc.goodIdx, runs={run}, tries=12, fast=False, tolerance=0.1)
+            #eng.setThetaMode()
+            eng.thetaConvergenceTest(self.cc.goodIdx, runs=runs, tries=12, fast=False, tolerance=0.1)
             cmd.finish(f'text="angleConverge of theta arm is finished"')
 
-    def moveToThetaAngleFromPhi60(self, cmd):
+    def moveToThetaAngleFromOpenPhi(self, cmd):
         """ Move cobras to nominal safe position: thetas OUT, phis in.
         Assumes phi is at 60deg and that we know thetaPositions.
         """
         cmdKeys = cmd.cmd.keywords
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        phiAngle = 60.0
-        tolerance = np.rad2deg(0.05)
+        angleList = np.load(f'/data/MCS/20210816_090/output/phiOpenAngle')
+        
+        cobraIdx = np.arange(2394)
+        thetas = np.full(len(2394), 0.5*np.pi)
+        thetas[cobraIdx<798] += np.pi*2/3
+        thetas[cobraIdx>=1596] -= np.pi*2/3
+        thetas = thetas % (np.pi*2)
+        
+        phiAngle = angleList
+        tolerance = np.rad2deg(0.5)
         angle = (180.0 - phiAngle) / 2.0
         thetaAngles = np.full(len(self.allCobras), -angle, dtype='f4')
         thetaAngles[np.arange(0, self.nCobras, 2)] += 0
         thetaAngles[np.arange(1, self.nCobras, 2)] += 180
 
         dataPath, diffAngles, moves = eng.moveThetaAngles(self.cc.goodIdx, thetaAngles,
-                                                          relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)
+                                relative=False, local=True, tolerance=0.002, tries=12, fast=False, newDir=True)
 
         cmd.finish(f'text="gotoSafeFromPhi60 is finished"')
 
@@ -901,8 +937,8 @@ class FpsCmd(object):
         positions = self.cc.pfi.anglesToPositions(self.cc.allCobras, thetaAngle, phiAngle)
 
         dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetaAngle[self.cc.goodIdx],
-                                                             phiAngle[self.cc.goodIdx], relative=False, local=True, tolerance=0.2, tries=12, homed=False,
-                                                             newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+                                phiAngle[self.cc.goodIdx], relative=False, local=True, tolerance=0.2, tries=12, homed=False,
+                                newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
 
         np.save(dataPath / 'positions', positions)
         np.save(dataPath / 'targets', targets)
