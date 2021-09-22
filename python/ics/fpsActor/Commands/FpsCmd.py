@@ -36,6 +36,9 @@ from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
 from ics.fpsActor.utils import display as vis
+
+from ics.fpsActor.utils import pfsDesign
+
 reload(vis)
 
 reload(calculation)
@@ -74,14 +77,13 @@ class FpsCmd(object):
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
-            ('cobraMoveThetaAngles', '<stepsize>', self.cobraMoveThetaAngles),
             ('cobraAndDotRecenter', '', self.cobraAndDotRecenter),
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
             ('moveToHome', '@(phi|theta|all [<visit>])', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToObsTarget', '[<visit>]', self.moveToObsTarget),
+            ('moveToDesignID', '<designID> [<visit>]', self.moveToDesignID),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             # ('gotoVerticalFromPhi60', '[<visit>]', self.gotoVerticalFromPhi60),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -103,6 +105,7 @@ class FpsCmd(object):
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
                                         keys.Key("angle", types.Int(), help="arm angle"),
+                                        keys.Key("designID", types.Long(), help="PFS design ID"),
                                         keys.Key("stepsize", types.Int(), help="step size of motor"),
                                         keys.Key("repeat", types.Int(),
                                                  help="number of iteration for motor map generation"),
@@ -862,7 +865,7 @@ class FpsCmd(object):
         """
         visit = self.actor.visitor.setOrGetVisit(cmd)
         eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.2,
-                               tries=24, homed=False, newDir=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+                               tries=12, homed=False, newDir=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
 
         cmd.finish(f'text="gotoSafeFromPhi60 is finished"')
 
@@ -918,69 +921,40 @@ class FpsCmd(object):
 
         cmd.finish(f'text="Motor on-time scan is finished."')
     
-    def moveToDotLocation(self,cmd):
-        """ Move cobras to the a location noext to DOT. """
+    def moveToDesignID(self,cmd):
+
+        """ Move cobras to the a PFS design location. """
+
+        cmdKeys = cmd.cmd.keywords
+        designID = cmd.cmd.keywords['designID'].values[0]
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        '''
-            Here we implements the reader for the design location.
-        '''
+        targetPos = pfsDesign.loadPfsDesign(designID)    
+        targets = targetPos[:,0]+targetPos[:,1]*1j
+        targets = targets[self.cc.goodIdx]
 
 
-        cobras = cc.allCobras[self.cc.goodIdx]
-        thetas, phis, flags = cc.pfi.positionsToAngles(cobras, targets)
+        cobras = self.cc.allCobras[self.cc.goodIdx]
+        thetas, phis, flags = self.cc.pfi.positionsToAngles(cobras, targets)
         valid = (flags[:,0] & self.cc.pfi.SOLUTION_OK) != 0
         if not np.all(valid):
             raise RuntimeError(f"Given positions are invalid: {np.where(valid)[0]}")
 
         # adjust theta angles that is too closed to the CCW hard stops
+        thetaMarginCCW=0.1
         thetas[thetas < thetaMarginCCW] += np.pi*2
 
-        positions = self.cc.pfi.anglesToPositions(self.cc.allCobras, thetaAngle, phiAngle)
-
-        dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetaAngle[self.cc.goodIdx],
-                                phiAngle[self.cc.goodIdx], relative=False, local=True, tolerance=0.2, tries=12, homed=False,
+        dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas[:,0],
+                                phis[:,0], relative=False, local=True, tolerance=0.2, tries=12, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
 
-        np.save(dataPath / 'positions', positions)
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
 
 
-        cmd.finish(f'text="Motor on-time scan is finished."')
+        cmd.finish(f'text="We are at design position. Do the work punk!"')
     
     
-    def moveToObsTarget(self, cmd):
-        """ Move cobras to the pfsDesign. """
-        visit = self.actor.visitor.setOrGetVisit(cmd)
-
-        '''
-            Adding a better interface for reading the targets.
-        '''
-
-        #datapath = '/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/hyoshida/'
-        #target_file = f'{datapath}/pfsdesign_test_20201228_command_positions.csv'
-        #data = pd.read_csv(target_file)
-
-        thetaAngle = data['theta(rad)'].values
-        phiAngle = data['phi(rad)'].values
-
-        targets = np.zeros([2394, 2])
-
-        targets[:, 0] = thetaAngle
-        targets[:, 1] = phiAngle
-
-        positions = self.cc.pfi.anglesToPositions(self.cc.allCobras, thetaAngle, phiAngle)
-
-        dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetaAngle[self.cc.goodIdx],
-                                phiAngle[self.cc.goodIdx], relative=False, local=True, tolerance=0.2, tries=12, homed=False,
-                                newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
-
-        np.save(dataPath / 'positions', positions)
-        np.save(dataPath / 'targets', targets)
-        np.save(dataPath / 'moves', moves)
-
-        cmd.finish(f'text="MoveToObsTarget sequence finished"')
 
     def getAEfromFF(self, cmd, frameId):
         """ Checking distortion with fidicial fibers.  """
