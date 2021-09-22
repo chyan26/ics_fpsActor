@@ -954,9 +954,13 @@ class FpsCmd(object):
         """ Move cobras to the pfsDesign. """
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        datapath = '/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/hyoshida/'
-        target_file = f'{datapath}/pfsdesign_test_20201228_command_positions.csv'
-        data = pd.read_csv(target_file)
+        '''
+            Adding a better interface for reading the targets.
+        '''
+
+        #datapath = '/home/pfs/mhs/devel/ics_cobraCharmer/procedures/moduleTest/hyoshida/'
+        #target_file = f'{datapath}/pfsdesign_test_20201228_command_positions.csv'
+        #data = pd.read_csv(target_file)
 
         thetaAngle = data['theta(rad)'].values
         phiAngle = data['phi(rad)'].values
