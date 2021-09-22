@@ -917,7 +917,39 @@ class FpsCmd(object):
                                                                     totalSteps=15000, repeat=1, scaling=3.0, tolerance=np.deg2rad(3.0))
 
         cmd.finish(f'text="Motor on-time scan is finished."')
+    
+    def moveToDotLocation(self,cmd):
+        """ Move cobras to the a location noext to DOT. """
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
+        '''
+            Here we implements the reader for the design location.
+        '''
+
+
+        cobras = cc.allCobras[self.cc.goodIdx]
+        thetas, phis, flags = cc.pfi.positionsToAngles(cobras, targets)
+        valid = (flags[:,0] & self.cc.pfi.SOLUTION_OK) != 0
+        if not np.all(valid):
+            raise RuntimeError(f"Given positions are invalid: {np.where(valid)[0]}")
+
+        # adjust theta angles that is too closed to the CCW hard stops
+        thetas[thetas < thetaMarginCCW] += np.pi*2
+
+        positions = self.cc.pfi.anglesToPositions(self.cc.allCobras, thetaAngle, phiAngle)
+
+        dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetaAngle[self.cc.goodIdx],
+                                phiAngle[self.cc.goodIdx], relative=False, local=True, tolerance=0.2, tries=12, homed=False,
+                                newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+
+        np.save(dataPath / 'positions', positions)
+        np.save(dataPath / 'targets', targets)
+        np.save(dataPath / 'moves', moves)
+
+
+        cmd.finish(f'text="Motor on-time scan is finished."')
+    
+    
     def moveToObsTarget(self, cmd):
         """ Move cobras to the pfsDesign. """
         visit = self.actor.visitor.setOrGetVisit(cmd)
