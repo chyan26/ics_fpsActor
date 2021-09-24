@@ -8,7 +8,7 @@ def _findPfsDesignFile(visit):
     import pathlib
 
     designRoot = pathlib.Path('/data/pfsDesign')
-    filename = f'pfsDesign-{visit:#016x}.fits'
+    filename = f'pfsDesign-0x{visit:016x}.fits'
 
     matched = tuple(designRoot.glob(filename))
     if len(matched) == 0:

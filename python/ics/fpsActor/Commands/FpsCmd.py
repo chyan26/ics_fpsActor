@@ -97,8 +97,8 @@ class FpsCmd(object):
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
             ('testLoop', '[<visit>] [<expTime>] [<cnt>]', self.testIteration), # Historical alias.
-            ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps)
-            #('cobraMoveAngles', '[<phi>] [<theta>]', self.cobraMoveAngles),
+            ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
+            ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles)
         ]
 
         # Define typed command arguments for the above commands.
@@ -126,8 +126,8 @@ class FpsCmd(object):
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("frameId", types.Int(), help="PFS Frame ID"),
                                         keys.Key("iteration", types.Int(), help="Interation number"),
-                                        keys.Key(
-                                            "id", types.Long(), help="fpsDesignId for the field,which defines the fiber positions"),
+                                        keys.Key("id", types.Long(),
+                                                 help="pfsDesignId, to define the target fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
                                         keys.Key("expTime", types.Float(), help="Seconds for exposure"),
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
@@ -496,9 +496,41 @@ class FpsCmd(object):
 
         cmd.finish()
 
+
+    def cobraMoveAngles(self, cmd):
+        """Move cobra in angle. """
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+
+        cmdKeys = cmd.cmd.keywords
+
+        # Switch from default no centroids to default do centroids
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+        cobras = self.cc.allCobras
+
+        cmdKeys = cmd.cmd.keywords
+        angles = cmd.cmd.keywords['angle'].values[0]
+
+        if phi:
+            phiMoveAngle = np.deg2rad(np.full(2394,angles))
+            thetaMoveAngle = np.zeros(2394)
+        else:
+            phiMoveAngle = np.zeros(2394)
+            thetaMoveAngle = np.deg2rad(np.full(2394,angles))
+
+
+        self.cc.moveDeltaAngles(cobras[self.cc.goodIdx], thetaMoveAngle[self.cc.goodIdx], 
+            phiMoveAngle[self.cc.goodIdx], thetaFast=False, phiFast=False)
+
+
+        cmd.finish('text="cobraMoveAngles completed"')
+
     def cobraMoveSteps(self, cmd):
         """Move single cobra in steps. """
         visit = self.actor.visitor.setOrGetVisit(cmd)
+
+        cmdKeys = cmd.cmd.keywords
 
         # Switch from default no centroids to default do centroids
         phi = 'phi' in cmdKeys
@@ -511,7 +543,7 @@ class FpsCmd(object):
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
 
         thetaSteps = np.zeros(len(cobras))
-        phiSteps = np.zeros(len(cobra))
+        phiSteps = np.zeros(len(cobras))
 
         if theta is True:
             self.logger.info(f'theta arm is activated, moving {stepsize} steps')
@@ -522,7 +554,7 @@ class FpsCmd(object):
 
         self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps)
 
-        cmd.finish('text="cobraMoveSteps completed"')
+        cmd.finish(f'text="cobraMoveSteps stepsize = {stepsize} completed"')
 
     def makeMotorMap(self, cmd):
         """ Making motor map. """
@@ -924,6 +956,7 @@ class FpsCmd(object):
     def moveToDesignID(self,cmd):
 
         """ Move cobras to the a PFS design location. """
+        twoSteps = True
 
         cmdKeys = cmd.cmd.keywords
         designID = cmd.cmd.keywords['designID'].values[0]
@@ -935,22 +968,56 @@ class FpsCmd(object):
 
 
         cobras = self.cc.allCobras[self.cc.goodIdx]
-        thetas, phis, flags = self.cc.pfi.positionsToAngles(cobras, targets)
+        thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
         valid = (flags[:,0] & self.cc.pfi.SOLUTION_OK) != 0
         if not np.all(valid):
             raise RuntimeError(f"Given positions are invalid: {np.where(valid)[0]}")
 
+        thetas = thetaSolution[:,0]
+        phis = phiSolution[:,0]
         # adjust theta angles that is too closed to the CCW hard stops
         thetaMarginCCW=0.1
         thetas[thetas < thetaMarginCCW] += np.pi*2
+        self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
-        dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas[:,0],
-                                phis[:,0], relative=False, local=True, tolerance=0.2, tries=12, homed=False,
+        if twoSteps:
+            cIds=self.cc.goodIdx
+
+            moves = np.zeros((1, len(cIds), 12), dtype=eng.moveDtype)
+            
+            thetaRange = ((self.cc.calibModel.tht1 - self.cc.calibModel.tht0 + np.pi) % (np.pi*2) + np.pi)[cIds]
+            phiRange = ((self.cc.calibModel.phiOut - self.cc.calibModel.phiIn) % (np.pi*2))[cIds]
+            
+            # limit phi angle for first two tries
+            limitPhi = np.pi/3 - self.cc.calibModel.phiIn[cIds] - np.pi
+            thetasVia = np.copy(thetas)
+            phisVia = np.copy(phis)
+            for c in range(len(cIds)):
+                if phis[c] > limitPhi[c]:
+                    phisVia[c] = limitPhi[c]
+                    thetasVia[c] = thetas[c] + (phis[c] - limitPhi[c])/2
+                    if thetasVia[c] > thetaRange[c]:
+                        thetasVia[c] = thetaRange[c]
+
+            _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
+            self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
+            dataPath, atThetas, atPhis, moves[0,:,:2], _ = \
+                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.05, 
+                            tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
+                            threshold=20.0,thetaMargin=np.deg2rad(15.0))
+
+            self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
+            dataPath, atThetas, atPhis, moves[0,:,2:], badMoves = \
+                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=0.05, tries=10, homed=False,
+                                newDir=True, thetaFast=False, phiFast=True, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+        else:
+            dataPath, atThetas, atPhis, moves, badMoves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
+                                phis, relative=False, local=True, tolerance=0.05, tries=12, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
 
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
-
+        np.save(dataPath / 'badMoves', badMoves)
 
         cmd.finish(f'text="We are at design position. Do the work punk!"')
     
