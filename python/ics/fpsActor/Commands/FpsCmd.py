@@ -82,7 +82,7 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all [<visit>])', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToDesignID', '<designID> [<visit>]', self.moveToDesignID),
+            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             # ('gotoVerticalFromPhi60', '[<visit>]', self.gotoVerticalFromPhi60),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -104,7 +104,7 @@ class FpsCmd(object):
         self.keys = keys.KeysDictionary("fps_fps", (1, 1),
                                         keys.Key("cnt", types.Int(), help="times to run loop"),
                                         keys.Key("angle", types.Int(), help="arm angle"),
-                                        keys.Key("designID", types.Long(), help="PFS design ID"),
+                                        keys.Key("designId", types.Long(), help="PFS design ID"),
                                         keys.Key("stepsize", types.Int(), help="step size of motor"),
                                         keys.Key("repeat", types.Int(),
                                                  help="number of iteration for motor map generation"),
@@ -544,7 +544,6 @@ class FpsCmd(object):
 
     def cobraMoveSteps(self, cmd):
         """Move single cobra in steps. """
-        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         cmdKeys = cmd.cmd.keywords
 
@@ -969,13 +968,11 @@ class FpsCmd(object):
 
         cmd.finish(f'text="Motor on-time scan is finished."')
     
-    def moveToDesignID(self,cmd):
-
-        """ Move cobras to the a PFS design location. """
-        twoSteps = True
+    def moveToPfsDesign(self,cmd):
+        """ Move cobras to a PFS design. """
 
         cmdKeys = cmd.cmd.keywords
-        designID = cmd.cmd.keywords['designID'].values[0]
+        designId = cmdKeys['designId'].values[0]
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
         targetPos = pfsDesign.loadPfsDesign(designID)    
