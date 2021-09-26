@@ -50,11 +50,12 @@ class Fps(actorcore.ICC.ICC):
     def __init__(self, name, productName=None, debugLevel=30):
         # This sets up the connections to/from the hub, the logger, and the twisted reactor.
         #
+        self.db = None
+        self.cc = None
+
         actorcore.ICC.ICC.__init__(self, name, productName=productName)
 
         self.everConnected = False
-
-        self._db = None
 
     def connectionMade(self):
         if self.everConnected is False:

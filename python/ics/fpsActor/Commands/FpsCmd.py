@@ -56,7 +56,6 @@ class FpsCmd(object):
         self.nv = najaVenator.NajaVenator()
 
         self.tranMatrix = None
-        self._db = None
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
         # associated methods when matched. The callbacks will be
@@ -138,16 +137,33 @@ class FpsCmd(object):
         self.logger = logging.getLogger('fps')
         self.logger.setLevel(logging.INFO)
 
-        self.cc = None
         self.fpgaHost = 'fpga'
         self.p = None
         self.simDataPath = None
 
+        if self.cc is not None:
+            eng.setCobraCoach(self.cc)
+
+    # .cc and .db live in the actor, so that we can reload safely.
+    @property
+    def cc(self):
+        return self.actor.cc
+    @cc.setter
+    def cc(self, newValue):
+        self.actor.cc = newValue
+
+    @property
+    def db(self):
+        return self.actor.db
+    @db.setter
+    def db(self, newValue):
+        self.actor.db = newValue
+
     def connectToDB(self, cmd):
         """connect to the database if not already connected"""
 
-        if self._db is not None:
-            return self._db
+        if self.db is not None:
+            return self.db
 
         try:
             config = self.actor.config
@@ -159,16 +175,16 @@ class FpsCmd(object):
             raise RuntimeError(f'failed to load opdb configuration: {e}')
 
         try:
-            db = opdb.OpDB(hostname, port, dbname, username)
-            db.connect()
+            _db = opdb.OpDB(hostname, port, dbname, username)
+            _db.connect()
         except:
             raise RuntimeError("unable to connect to the database")
 
         if cmd is not None:
             cmd.inform('text="Connected to Database"')
 
-        self._db = db
-        return self._db
+        self.db = _db
+        return self.db
 
     def fpgaSim(self, cmd):
         """Turn on/off simulalation mode of FPGA"""
