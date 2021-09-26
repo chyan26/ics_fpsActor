@@ -521,7 +521,6 @@ class FpsCmd(object):
 
         # Switch from default no centroids to default do centroids
         phi = 'phi' in cmdKeys
-        theta = 'theta' in cmdKeys
 
         cobras = self.cc.allCobras
 
@@ -535,9 +534,8 @@ class FpsCmd(object):
             phiMoveAngle = np.zeros(2394)
             thetaMoveAngle = np.deg2rad(np.full(2394,angles))
 
-
         self.cc.moveDeltaAngles(cobras[self.cc.goodIdx], thetaMoveAngle[self.cc.goodIdx], 
-            phiMoveAngle[self.cc.goodIdx], thetaFast=False, phiFast=False)
+                                phiMoveAngle[self.cc.goodIdx], thetaFast=False, phiFast=False)
 
 
         cmd.finish('text="cobraMoveAngles completed"')
@@ -550,7 +548,6 @@ class FpsCmd(object):
         # Switch from default no centroids to default do centroids
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
-
 
         cobras = self.cc.allCobras
 
@@ -567,7 +564,7 @@ class FpsCmd(object):
             self.logger.info(f'phi arm is activated, moving {stepsize} steps')
             phiSteps = phiSteps+stepsize
 
-        self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps)
+        self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps, thetaFast=False, phiFast=False)
 
         cmd.finish(f'text="cobraMoveSteps stepsize = {stepsize} completed"')
 
@@ -911,8 +908,8 @@ class FpsCmd(object):
 
         """
         visit = self.actor.visitor.setOrGetVisit(cmd)
-        eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.2,
-                               tries=12, homed=False, newDir=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+        eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.01,
+                               tries=12, homed=False, newDir=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
         cmd.finish(f'text="gotoSafeFromPhi60 is finished"')
 
@@ -975,10 +972,17 @@ class FpsCmd(object):
         designId = cmdKeys['designId'].values[0]
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        targetPos = pfsDesign.loadPfsDesign(designID)    
+        twoStepOff = 'twoStepOff' in cmdKeys
+        if twoStepOff:
+            twoSteps = False
+        else:
+            twoSteps = True
+
+        cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
+
+        targetPos = pfsDesign.loadPfsDesign(designId)
         targets = targetPos[:,0]+targetPos[:,1]*1j
         targets = targets[self.cc.goodIdx]
-
 
         cobras = self.cc.allCobras[self.cc.goodIdx]
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
@@ -1015,26 +1019,24 @@ class FpsCmd(object):
             _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
             dataPath, atThetas, atPhis, moves[0,:,:2], _ = \
-                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.05, 
+                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.01, 
                             tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
-                            threshold=20.0,thetaMargin=np.deg2rad(15.0))
+                            threshold=2.0,thetaMargin=np.deg2rad(15.0))
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:], badMoves = \
-                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=0.05, tries=10, homed=False,
-                                newDir=True, thetaFast=False, phiFast=True, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=0.01, tries=10, homed=False,
+                                newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
             dataPath, atThetas, atPhis, moves, badMoves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
-                                phis, relative=False, local=True, tolerance=0.05, tries=12, homed=False,
-                                newDir=True, thetaFast=False, phiFast=False, threshold=20.0, thetaMargin=np.deg2rad(15.0))
+                                phis, relative=False, local=True, tolerance=0.01, tries=12, homed=False,
+                                newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
         np.save(dataPath / 'badMoves', badMoves)
 
         cmd.finish(f'text="We are at design position. Do the work punk!"')
-    
-    
 
     def getAEfromFF(self, cmd, frameId):
         """ Checking distortion with fidicial fibers.  """
