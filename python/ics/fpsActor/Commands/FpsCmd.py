@@ -101,6 +101,7 @@ class FpsCmd(object):
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
             ('loadDotScales', '<filename>', self.loadDotScales),
             ('updateDotLoop', '<filename> [<stepsPerMove>]', self.updateDotLoop),
+            ('testDotMove', '[<stepsPerMove>]', self.testDotMove),
         ]
 
         # Define typed command arguments for the above commands.
@@ -1056,7 +1057,6 @@ class FpsCmd(object):
         for i_i, phiScale in enumerate(scaling.itertuples()):
             cobraIdx = phiScale.cobra_id - 1
             self.dotScales[cobraIdx] = phiScale.scale
-            cmd.inform(f'text="{cobraIdx} {phiScale.cobra_id} {phiScale.scale}"')
 
         cmd.finish(f'text="loaded {(self.dotScales != 0).sum()} phi scales"')
 
@@ -1088,7 +1088,25 @@ class FpsCmd(object):
 
         cmd.finish(f'text="dot move done"')
 
+    def testDotMove(self, cmd):
+        """ Move phi motors by a number of steps scaled by our internal dot scaling"""
+        cmdKeys = cmd.cmd.keywords
+        stepsPerMove = cmdKeys['stepsPerMove'].values[0]
 
+        cobras = self.cc.allCobras
+        goodCobras = self.cc.goodCobras
+
+        thetaSteps = np.zeros(len(cobras), dtype='i4')
+        phiSteps = np.zeros(len(cobras), dtype='i4')
+
+        for cobraIdx in cobras:
+            if goodCobras[cobraIdx]:
+                phiSteps[cobraIdx] = stepsPerMove*self.dotScales[cobraIdx] 
+        self.logger.info("moving phi steps:", phiSteps)
+        cmd.inform(f'text="moving {(phiSteps != 0).sum()} phi motors approx {stepsPerMove} steps')
+
+        self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps, thetaFast=False, phiFast=False)
+        cmd.finish(f'text="dot move done"')
 
     def getAEfromFF(self, cmd, frameId):
         """ Checking distortion with fidicial fibers.  """
