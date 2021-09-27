@@ -95,9 +95,12 @@ class FpsCmd(object):
             #
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
+            ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
             ('testLoop', '[<visit>] [<expTime>] [<cnt>]', self.testIteration), # Historical alias.
             ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
-            ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles)
+            ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
+            ('loadDotScales', '<filename>', self.loadDotScales),
+            ('updateDotLoop', '<filename> [<stepsPerMove>]', self.updateDotLoop),
         ]
 
         # Define typed command arguments for the above commands.
@@ -132,6 +135,8 @@ class FpsCmd(object):
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
                                         keys.Key("phi", types.Float(), help="Distance to move phi"),
                                         keys.Key("board", types.Int(), help="board index 1-84"),
+                                        keys.Key("stepsPerMove", types.Int(), default=-50,
+                                                 help="number of steps per move")
                                         )
 
         self.logger = logging.getLogger('fps')
@@ -1037,6 +1042,53 @@ class FpsCmd(object):
         np.save(dataPath / 'badMoves', badMoves)
 
         cmd.finish(f'text="We are at design position. Do the work punk!"')
+
+    def loadDotScales(self, cmd):
+        """Load step scaling just for the dot traversal loop. """
+
+        cmdKeys = cmd.cmd.keywords
+        filename = cmdKeys['filename'].values[0]
+
+        cobras = self.cc.allCobras
+        self.dotScales = np.zeros(len(cobras))
+
+        scaling = pd.read_csv(filename)
+        for i_i, phiScale in enumerate(scaling.itertuples()):
+            cobraIdx = phiScale.cobra_id - 1
+            self.dotScales[cobraIdx] = phiScale.scale
+            cmd.inform(f'text="{cobraIdx} {phiScale.cobra_id} {phiScale.scale}"')
+
+        cmd.finish(f'text="loaded {(self.dotScales != 0).sum()} phi scales"')
+
+    def updateDotLoop(self, cmd):
+        """ Move phi motors by a number of steps scaled by our internal dot scaling"""
+        cmdKeys = cmd.cmd.keywords
+        filename = cmdKeys['filename'].values[0]
+        stepsPerMove = cmdKeys['stepsPerMove'].values[0]
+
+        cobras = self.cc.allCobras
+        goodCobras = self.cc.goodCobras
+
+        thetaSteps = np.zeros(len(cobras), dtype='i4')
+        phiSteps = np.zeros(len(cobras), dtype='i4')
+
+        moves = pd.read_csv(filename)
+        allVisits = moves.visit.unique()
+        lastVisit = np.sort(allVisits)[-1]
+
+        for r_i, r in enumerate(moves[moves.visit == lastVisit].itertuples()):
+            print(r_i, r.cobraId, r.keepMoving)
+            cobraIdx = r.cobraId - 1
+            if r.keepMoving and goodCobras[cobraIdx]:
+                phiSteps[cobraIdx] = stepsPerMove*self.dotScales[cobraIdx] 
+        self.logger.info("moving phi steps:", phiSteps)
+        cmd.inform(f'text="NOT moving {(phiSteps != 0).sum()} phi motors approx {stepsPerMove} steps')
+
+        # self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps, thetaFast=False, phiFast=False)
+
+        cmd.finish(f'text="dot move done"')
+
+
 
     def getAEfromFF(self, cmd, frameId):
         """ Checking distortion with fidicial fibers.  """
