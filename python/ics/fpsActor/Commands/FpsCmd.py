@@ -100,7 +100,7 @@ class FpsCmd(object):
             ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
             ('loadDotScales', '<filename>', self.loadDotScales),
-            ('updateDotLoop', '<filename> [<stepsPerMove>]', self.updateDotLoop),
+            ('updateDotLoop', '<filename> [<stepsPerMove>] [@noMove]', self.updateDotLoop),
             ('testDotMove', '[<stepsPerMove>]', self.testDotMove),
         ]
 
@@ -1065,9 +1065,10 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
         filename = cmdKeys['filename'].values[0]
         stepsPerMove = cmdKeys['stepsPerMove'].values[0]
+        noMove = 'noMove' in cmdKeys
 
         cobras = self.cc.allCobras
-        goodCobras = self.cc.goodCobras
+        goodCobras = self.cc.goodIdx
 
         thetaSteps = np.zeros(len(cobras), dtype='i4')
         phiSteps = np.zeros(len(cobras), dtype='i4')
@@ -1075,16 +1076,16 @@ class FpsCmd(object):
         moves = pd.read_csv(filename)
         allVisits = moves.visit.unique()
         lastVisit = np.sort(allVisits)[-1]
-
+        cmd.inform(f'text="using dot mask for visit={lastVisit}, {len(goodCobras)} good cobras {goodCobras[:5]}"')
         for r_i, r in enumerate(moves[moves.visit == lastVisit].itertuples()):
-            print(r_i, r.cobraId, r.keepMoving)
             cobraIdx = r.cobraId - 1
-            if r.keepMoving and goodCobras[cobraIdx]:
+            if r.keepMoving and cobraIdx in goodCobras:
                 phiSteps[cobraIdx] = stepsPerMove*self.dotScales[cobraIdx] 
-        self.logger.info("moving phi steps:", phiSteps)
-        cmd.inform(f'text="NOT moving {(phiSteps != 0).sum()} phi motors approx {stepsPerMove} steps')
+                self.logger.info(f"{r_i} {r.cobraId} {phiSteps[cobraIdx]}")
 
-        # self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps, thetaFast=False, phiFast=False)
+        cmd.inform(f'text="moving={not noMove} {(phiSteps != 0).sum()} phi motors approx {stepsPerMove} steps')
+        if not noMove:
+            self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps, thetaFast=False, phiFast=False)
 
         cmd.finish(f'text="dot move done"')
 
@@ -1099,13 +1100,14 @@ class FpsCmd(object):
         thetaSteps = np.zeros(len(cobras), dtype='i4')
         phiSteps = np.zeros(len(cobras), dtype='i4')
 
-        for cobraIdx in cobras:
-            if goodCobras[cobraIdx]:
+        for cobraIdx in range(len(cobras)):
+            if cobraIdx+1 not in goodCobras:
                 phiSteps[cobraIdx] = stepsPerMove*self.dotScales[cobraIdx] 
         self.logger.info("moving phi steps:", phiSteps)
         cmd.inform(f'text="moving {(phiSteps != 0).sum()} phi motors approx {stepsPerMove} steps')
 
         self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps, thetaFast=False, phiFast=False)
+        self.testIteration(cmd, doFinish=False)
         cmd.finish(f'text="dot move done"')
 
     def getAEfromFF(self, cmd, frameId):
