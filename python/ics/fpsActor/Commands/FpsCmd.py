@@ -96,7 +96,8 @@ class FpsCmd(object):
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
             ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
-            ('testLoop', '[<visit>] [<expTime>] [<cnt>]', self.testIteration), # Historical alias.
+            ('testLoop', '[<visit>] [<expTime>] [<cnt>] [@noMatching]',
+             self.testIteration), # Historical alias.
             ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
             ('loadDotScales', '<filename>', self.loadDotScales),
@@ -497,12 +498,12 @@ class FpsCmd(object):
 
         cmd.finish(f'text="camera ping={ret}"')
 
-    def testIteration(self, cmd):
+    def testIteration(self, cmd, doFinish=True):
         """Test camera and all non-motion data: we provide target table data """
 
         cmdKeys = cmd.cmd.keywords
         visit = self.actor.visitor.setOrGetVisit(cmd)
-
+        doMatch = 'noMatching' not in cmdKeys
         cnt = cmdKeys["cnt"].values[0] \
               if 'cnt' in cmdKeys \
                  else 1
@@ -513,9 +514,10 @@ class FpsCmd(object):
         for i in range(cnt):
             frameSeq = self.actor.visitor.frameSeq
             cmd.inform(f'text="taking frame {visit}.{frameSeq} ({i+1}/{cnt}) and measuring centroids."')
-            pos = self.cc.exposeAndExtractPositions(exptime=expTime)
+            pos = self.cc.exposeAndExtractPositions(exptime=expTime, doFibreID=doMatch)
             cmd.inform(f'text="found {len(pos)} spots in {visit}.{frameSeq} "')
 
+        if doFinish:
         cmd.finish()
 
 
