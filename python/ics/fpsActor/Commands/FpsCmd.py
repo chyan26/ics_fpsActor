@@ -518,7 +518,7 @@ class FpsCmd(object):
             cmd.inform(f'text="found {len(pos)} spots in {visit}.{frameSeq} "')
 
         if doFinish:
-        cmd.finish()
+            cmd.finish()
 
 
     def cobraMoveAngles(self, cmd):
@@ -980,8 +980,8 @@ class FpsCmd(object):
         designId = cmdKeys['designId'].values[0]
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        twoStepOff = 'twoStepOff' in cmdKeys
-        if twoStepOff:
+        twoStepsOff = 'twoStepsOff' in cmdKeys
+        if twoStepsOff:
             twoSteps = False
         else:
             twoSteps = True
@@ -1026,23 +1026,23 @@ class FpsCmd(object):
 
             _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
-            dataPath, atThetas, atPhis, moves[0,:,:2], _ = \
+            dataPath, atThetas, atPhis, moves[0,:,:2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.01, 
                             tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
                             threshold=2.0,thetaMargin=np.deg2rad(15.0))
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
-            dataPath, atThetas, atPhis, moves[0,:,2:], badMoves = \
+            dataPath, atThetas, atPhis, moves[0,:,2:] = \
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=0.01, tries=10, homed=False,
                                 newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
-            dataPath, atThetas, atPhis, moves, badMoves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
+            dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
                                 phis, relative=False, local=True, tolerance=0.01, tries=12, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
-        np.save(dataPath / 'badMoves', badMoves)
+        #np.save(dataPath / 'badMoves', badMoves)
 
         cmd.finish(f'text="We are at design position. Do the work punk!"')
 
