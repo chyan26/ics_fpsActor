@@ -396,6 +396,26 @@ class FpsCmd(object):
         res = self.cc.pfi.diag()
         cmd.finish(f'text="diag = {res}"')
 
+    def bialight(self, cmd):
+        """Turn on/off the BIA light"""
+        cmdKeys = cmd.cmd.keywords
+
+        bia_on = 'on' in cmdKeys
+        bia_off = 'off' in cmdKeys
+
+        if light_on:
+            cmdString = f'bia on'
+            infoString = 'Turn on BIA light'
+
+        else:
+            cmdString = f'bia off'
+            infoString = 'Turn off BIA light'
+
+        cmdVar = self.actor.cmdr.call(actor='sps', cmdStr=cmdString,
+                                      forUserCmd=cmd, timout=10)
+
+        self.logger.info(f'{infoString}')
+
     def ledlight(self, cmd):
         """Turn on/off the fiducial fiber light"""
         cmdKeys = cmd.cmd.keywords
