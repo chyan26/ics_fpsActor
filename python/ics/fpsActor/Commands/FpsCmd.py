@@ -73,6 +73,7 @@ class FpsCmd(object):
             ('connect', '', self.connect),
             ('buildTransMatrix', '[<frameId>]', self.buildTransMatrix),
             ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
+            ('bialight', '@(on|off)', self.bialight),
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
             ('loadModel', '<xml>', self.loadModel),
@@ -403,7 +404,7 @@ class FpsCmd(object):
         bia_on = 'on' in cmdKeys
         bia_off = 'off' in cmdKeys
 
-        if light_on:
+        if bia_on:
             cmdString = f'bia on'
             infoString = 'Turn on BIA light'
 
