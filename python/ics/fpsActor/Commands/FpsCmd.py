@@ -1000,6 +1000,14 @@ class FpsCmd(object):
 
         thetas = thetaSolution[:,0]
         phis = phiSolution[:,0]
+        
+        # Here we start to deal with target table
+        traj, moves = eng.createTrajectory(self.cc.goodIdx, thetas, phis, tries=12, 
+            twoSteps=True, threshold=20.0, timeStep=500)
+        
+        targetTable = traj.calculateFiberPositions(self.cc)
+
+
         # adjust theta angles that is too closed to the CCW hard stops
         thetaMarginCCW=0.1
         thetas[thetas < thetaMarginCCW] += np.pi*2
