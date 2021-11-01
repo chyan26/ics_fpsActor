@@ -1231,58 +1231,12 @@ class FpsCmd(object):
         if ret.didFail:
             raise RuntimeError("mcs expose failed")
 
-        self.logger.info(f'Starting build matrix with FF on {frameNum}')
-        
-        # Use this latest matrix as initial guess for automatic calculating.
-        db = self.connectToDB(cmd)
-        sql = f'''SELECT * from mcs_pfi_transformation 
-            WHERE mcs_frame_id < {frameNum} ORDER BY mcs_frame_id DESC
-            FETCH FIRST ROW ONLY
-            '''
-        transMatrix = db.fetch_query(sql)
-        scale = transMatrix['x_scale'].values[0]
-        xoffset = transMatrix['x_trans'].values[0]
-        yoffset = transMatrix['y_trans'].values[0]
-        # Always 
-        angle = -transMatrix['angle'].values[0]
-        self.logger.info(f'Latest matrix = {xoffset} {yoffset} scale = {scale}, angle={angle}')
+        ret = self.actor.cmdr.call(actor='mcs',
+                                   cmdStr=f'calculateBoresight frameId={frameNum}',
+                                   forUserCmd=cmd, timeLim=30)
+        if ret.didFail:
+            raise RuntimeError("mcs expose failed")
 
-        # Loading FF from DB
-        ff_f3c = self.nv.readFFConfig()['x'].values+self.nv.readFFConfig()['y'].values*1j
-        rx, ry = fpstool.projectFCtoPixel([ff_f3c.real, ff_f3c.imag], scale, angle, [xoffset, yoffset])
-
-        # Load MCS data from DB
-        self.logger.info(f'Load frame from DB')
-        mcsData = self.nv.readCentroid(frameNum)
-
-        target = np.array([rx, ry]).T.reshape((len(rx), 2))
-        source = np.array([mcsData['centroidx'].values, mcsData['centroidy'].values]
-                          ).T.reshape((len(mcsData['centroidx'].values), 2))
-
-        match = fpstool.pointMatch(target, source)
-        ff_mcs = match[:, 0]+match[:, 1]*1j
-
-        mat = fpstool.getAffineFromFF(ff_mcs, ff_f3c)
-
-        dataInfo = {'mcs_frame_id': frameNum,
-                    'x_trans': mat['xTrans'],
-                    'y_trans': mat['yTrans'],
-                    'x_scale': mat['xScale'],
-                    'y_scale': mat['yScale'],
-                    'angle': np.rad2deg(mat['angle']),
-                    'calculated_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-
-        self.logger.info(
-            f"New matrix = {mat['xTrans']:04f} {mat['yTrans']:0.4f} scale = {mat['xScale']:0.2f}, angle={np.rad2deg(mat['angle']):0.2f}")
-        try:
-            db.insert('mcs_pfi_transformation', pd.DataFrame(data=dataInfo, index=[0]))
-        except:
-            self.logger.info(f'Updating transformation matrix')
-            db.update('mcs_pfi_transformation', pd.DataFrame(data=dataInfo, index=[0]))
-
-        xc = mat['xTrans']
-        yc = mat['yTrans']
         cmd.finish(f'mcsBoresight={xc:0.4f},{yc:0.4f}')
 
     def buildTransMatrix(self, cmd):
