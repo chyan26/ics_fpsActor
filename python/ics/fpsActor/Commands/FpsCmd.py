@@ -91,7 +91,7 @@ class FpsCmd(object):
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
             ('motorOntimeSearch', '@(phi|theta) [<visit>]', self.motorOntimeSearch),
             ('visCobraSpots', '@(phi|theta) <runDir>', self.visCobraSpots),
-            ('calculateBoresight', '', self.calculateBoresight),
+            ('calculateBoresight', '[<frameId>]', self.calculateBoresight),
             #
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
@@ -1221,21 +1221,22 @@ class FpsCmd(object):
 
     def calculateBoresight(self, cmd):
         """ Function for calculating the rotation center """
-        #cmdKeys = cmd.cmd.keywords
-        visit = self.actor.visitor.setOrGetVisit(cmd)
-        frameNum = self.actor.visitor.getNextFrameNum()
-        cmd.inform(f'text="frame={frameNum}"')
+        cmdKeys = cmd.cmd.keywords
+        if 'frameId' in cmdKeys:
+            frameId = cmdKeys['frameId'].values[0]
+
         ret = self.actor.cmdr.call(actor='mcs',
-                                   cmdStr=f'expose object expTime=0.5 frameId={frameNum} doCentroid',
+                                   cmdStr=f'calculateBoresight frameId={frameId}',
                                    forUserCmd=cmd, timeLim=30)
         if ret.didFail:
             raise RuntimeError("mcs expose failed")
 
-        ret = self.actor.cmdr.call(actor='mcs',
-                                   cmdStr=f'calculateBoresight frameId={frameNum}',
-                                   forUserCmd=cmd, timeLim=30)
-        if ret.didFail:
-            raise RuntimeError("mcs expose failed")
+        db = self.connectToDB(cmd)
+        
+        sql = f'''SELECT * FROM mcs_boresight ORDER BY calculated_at DESC FETCH FIRST ROW ONLY'''
+        df = db.fetch_query(sql)
+        xc=df['mcs_boresight_x_pix'][0]
+        yc=df['mcs_boresight_y_pix'][0]
 
         cmd.finish(f'mcsBoresight={xc:0.4f},{yc:0.4f}')
 
