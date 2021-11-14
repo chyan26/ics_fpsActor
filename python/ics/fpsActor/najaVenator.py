@@ -206,4 +206,43 @@ class NajaVenator(object):
             self.conn.close()
         pass
 
-#NajaVenator = najaVenator()
+class cobraTargetTable(object):
+    def __init__(self, visitid, tries, calibModel):
+
+        self.db = 'db-ics'
+        self._conn = None
+
+        self._dbConn = opdb.OpDB(hostname='db-ics', dbname='opdb', username='pfs')
+        self.visitid = visitid
+        self.tries = tries
+
+        self.interation = 1
+        self.calibModel = calibModel
+
+    def makeTargetTable(self, targets, targetThetas, targetPhis):
+        
+        table = {'pfs_visit_id': np.zeros(2394)+self.visitid,
+                'iteration':  np.zeros(2394)+self.interation,
+                'cobra_id': np.arange(2394)+1,
+                'pfs_config_id': np.arange(2394)+1,
+                'pfi_nominal_x_mm': self.calibModel.centers.real,
+                'pfi_nominal_y_mm': self.calibModel.centers.imag,
+                'pfi_target_x_mm' : targets.real,
+                'pfi_target_y_mm' : targets.imag,
+                'motor_target_theta': targetThetas,
+                'motor_target_phi': targetPhis,
+                
+        }
+        
+        self.dataTable = table
+        self.iteration = self.iteration + 1
+       
+    def writeTaegetTable(self):
+        
+        df = pd.DataFrame(data=self.dataTable)
+        self._dbConn.insert("cobra_target", df)
+
+    def __del__(self):
+        if self.conn is not None:
+            self.conn.close()
+        pass

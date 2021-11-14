@@ -54,7 +54,7 @@ class FpsCmd(object):
         self.actor = actor
 
         self.nv = najaVenator.NajaVenator()
-
+        
         self.tranMatrix = None
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -1007,6 +1007,7 @@ class FpsCmd(object):
         
         targetTable = traj.calculateFiberPositions(self.cc)
 
+        self.cobraTargetTable = najaVenator.cobraTargetTable(visit, 12, self.cc.calibModel)
 
         # adjust theta angles that is too closed to the CCW hard stops
         thetaMarginCCW=0.1
@@ -1037,7 +1038,7 @@ class FpsCmd(object):
             dataPath, atThetas, atPhis, moves[0,:,:2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.01, 
                             tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
-                            threshold=2.0,thetaMargin=np.deg2rad(15.0))
+                            threshold=2.0,thetaMargin=np.deg2rad(15.0), targetTab=self.cobraTargetTable)
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:] = \
@@ -1046,7 +1047,8 @@ class FpsCmd(object):
         else:
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
                                 phis, relative=False, local=True, tolerance=0.01, tries=12, homed=False,
-                                newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
+                                newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0), 
+                                targetTab=self.cobraTargetTable)
 
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
