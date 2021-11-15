@@ -91,7 +91,7 @@ class FpsCmd(object):
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
             ('motorOntimeSearch', '@(phi|theta) [<visit>]', self.motorOntimeSearch),
             ('visCobraSpots', '@(phi|theta) <runDir>', self.visCobraSpots),
-            ('calculateBoresight', '[<frameId>]', self.calculateBoresight),
+            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
             #
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
@@ -1220,6 +1220,33 @@ class FpsCmd(object):
         return match
 
     def calculateBoresight(self, cmd):
+            
+        """
+        function for calculating the rotation centre
+        """
+
+        firstFrame = cmd
+        
+        mcsTools.calcBoresight(db, frameIds, pfsVisitId)
+        
+        startFrame = cmdKeys['startFrame'].values[0]
+        endFrame = cmdKeys['endFrame'].values[0]
+
+        # get a list of frameIds
+        # two cases, for a single visitId, or multiple
+        if(endFrame // 100 == startFrame // 100):
+            frameIds = np.arange(startFrame, endFrame+1)
+        else:
+            frameIds = np.arange(startFrame,endFrame+100,100)
+
+        # use the pfsvisit id from the first frame for the database write
+        pfsVisitId = startFrame // 100
+
+        # the routine will calculate the value and write to db
+        mcsTools.calcBoresight(db, frameIds, pfsVisitId)
+
+    
+    def calculateBoresightOld(self, cmd):
         """ Function for calculating the rotation center """
         cmdKeys = cmd.cmd.keywords
         if 'frameId' in cmdKeys:
