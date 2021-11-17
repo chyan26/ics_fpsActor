@@ -503,7 +503,6 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
         visit = self.actor.visitor.setOrGetVisit(cmd)
-        doMatch = 'noMatching' not in cmdKeys
         cnt = cmdKeys["cnt"].values[0] \
               if 'cnt' in cmdKeys \
                  else 1
@@ -514,7 +513,7 @@ class FpsCmd(object):
         for i in range(cnt):
             frameSeq = self.actor.visitor.frameSeq
             cmd.inform(f'text="taking frame {visit}.{frameSeq} ({i+1}/{cnt}) and measuring centroids."')
-            pos = self.cc.exposeAndExtractPositions(exptime=expTime, doFibreID=doMatch)
+            pos = self.cc.exposeAndExtractPositions(exptime=expTime)
             cmd.inform(f'text="found {len(pos)} spots in {visit}.{frameSeq} "')
 
         if doFinish:
