@@ -20,7 +20,7 @@ import pandas as pd
 import cv2
 from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
-import pathlib
+import ics.mcsActor.mcsRoutines.mcsRoutines as mcsTools
 
 from copy import deepcopy
 
@@ -78,8 +78,9 @@ class FpsCmd(object):
             ('loadModel', '<xml>', self.loadModel),
             ('cobraAndDotRecenter', '', self.cobraAndDotRecenter),
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
+            ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
-            ('moveToHome', '@(phi|theta|all [<visit>])', self.moveToHome),
+            ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
@@ -100,7 +101,7 @@ class FpsCmd(object):
              self.testIteration), # Historical alias.
             ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
-            ('loadDotScales', '<filename>', self.loadDotScales),
+            ('loadDotScales', '[<filename>]', self.loadDotScales),
             ('updateDotLoop', '<filename> [<stepsPerMove>] [@noMove]', self.updateDotLoop),
             ('testDotMove', '[<stepsPerMove>]', self.testDotMove),
         ]
@@ -503,7 +504,6 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
         visit = self.actor.visitor.setOrGetVisit(cmd)
-        doMatch = 'noMatching' not in cmdKeys
         cnt = cmdKeys["cnt"].values[0] \
               if 'cnt' in cmdKeys \
                  else 1
@@ -514,7 +514,7 @@ class FpsCmd(object):
         for i in range(cnt):
             frameSeq = self.actor.visitor.frameSeq
             cmd.inform(f'text="taking frame {visit}.{frameSeq} ({i+1}/{cnt}) and measuring centroids."')
-            pos = self.cc.exposeAndExtractPositions(exptime=expTime, doFibreID=doMatch)
+            pos = self.cc.exposeAndExtractPositions(exptime=expTime)
             cmd.inform(f'text="found {len(pos)} spots in {visit}.{frameSeq} "')
 
         if doFinish:
@@ -557,7 +557,8 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
 
-        cobras = self.cc.allCobras
+        #cobraList = np.array([1240,2051,2262,2278,2380,2393])-1
+        cobras = self.cc.allCobras#[cobraList]
 
         cmdKeys = cmd.cmd.keywords
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
@@ -910,6 +911,25 @@ class FpsCmd(object):
         self.logger.info(f'Data path : {dataPath}')
         cmd.finish(f'text="PHI is now at {angle} degrees!"')
 
+    def movePhiForDots(self, cmd):
+        """ Making a convergence test to a specified phi angle. """
+        cmdKeys = cmd.cmd.keywords
+        angle = cmd.cmd.keywords['angle'].values[0]
+        itr = cmd.cmd.keywords['iteration'].values[0]
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+
+        if itr == 0:
+            itr = 8
+
+        self.logger.info(f'Move phi to angle = {angle}')
+
+        # move phi to certain degree for theta test
+        eng.moveToPhiAngleForDot(self.cc.goodIdx, angle, tolerance=0.01,
+                               tries=12, homed=False, newDir=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
+
+        cmd.finish(f'text="PHI is now at {angle} degrees!"')
+
+
     def moveToSafePosition(self, cmd):
         """ Move cobras to nominal safe position: thetas OUT, phis in.
         Assumes phi is at 60deg and that we know thetaPositions.
@@ -919,7 +939,7 @@ class FpsCmd(object):
         eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.01,
                                tries=12, homed=False, newDir=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
-        cmd.finish(f'text="gotoSafeFromPhi60 is finished"')
+        cmd.finish(f'text="moveToSafePosition is finished"')
 
     def motorOntimeSearch(self, cmd):
         """ FPS interface of searching the on time parameters for a specified motor speed """
@@ -1050,15 +1070,16 @@ class FpsCmd(object):
         """Load step scaling just for the dot traversal loop. """
 
         cmdKeys = cmd.cmd.keywords
-        filename = cmdKeys['filename'].values[0]
+        filename = cmdKeys['filename'].values[0] if 'filname' in cmdKeys else None
 
         cobras = self.cc.allCobras
-        self.dotScales = np.zeros(len(cobras))
+        self.dotScales = np.ones(len(cobras))
 
-        scaling = pd.read_csv(filename)
-        for i_i, phiScale in enumerate(scaling.itertuples()):
-            cobraIdx = phiScale.cobra_id - 1
-            self.dotScales[cobraIdx] = phiScale.scale
+        if filename is not None:
+            scaling = pd.read_csv(filename)
+            for i_i, phiScale in enumerate(scaling.itertuples()):
+                cobraIdx = phiScale.cobra_id - 1
+                self.dotScales[cobraIdx] = phiScale.scale
 
         cmd.finish(f'text="loaded {(self.dotScales != 0).sum()} phi scales"')
 
@@ -1225,10 +1246,8 @@ class FpsCmd(object):
         function for calculating the rotation centre
         """
 
-        firstFrame = cmd
-        
-        mcsTools.calcBoresight(db, frameIds, pfsVisitId)
-        
+        cmdKeys = cmd.cmd.keywords
+
         startFrame = cmdKeys['startFrame'].values[0]
         endFrame = cmdKeys['endFrame'].values[0]
 
@@ -1243,9 +1262,9 @@ class FpsCmd(object):
         pfsVisitId = startFrame // 100
 
         # the routine will calculate the value and write to db
+        db = self.connectToDB(cmd)
         mcsTools.calcBoresight(db, frameIds, pfsVisitId)
 
-    
     def calculateBoresightOld(self, cmd):
         """ Function for calculating the rotation center """
         cmdKeys = cmd.cmd.keywords
