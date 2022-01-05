@@ -1001,8 +1001,9 @@ class FpsCmd(object):
         phis = phiSolution[:,0]
         
         # Here we start to deal with target table
+        cmd.inform(f'text="Handling the cobra target table."')
         traj, moves = eng.createTrajectory(self.cc.goodIdx, thetas, phis, tries=12, 
-            twoSteps=True, threshold=20.0, timeStep=500)
+            twoSteps=True, threshold=2.0, timeStep=500)
         
         targetTable = traj.calculateFiberPositions(self.cc)
 
@@ -1037,7 +1038,7 @@ class FpsCmd(object):
             dataPath, atThetas, atPhis, moves[0,:,:2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.01, 
                             tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
-                            threshold=2.0,thetaMargin=np.deg2rad(15.0), targetTab=self.cobraTargetTable)
+                            threshold=2.0,thetaMargin=np.deg2rad(15.0))
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:] = \
@@ -1046,8 +1047,7 @@ class FpsCmd(object):
         else:
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
                                 phis, relative=False, local=True, tolerance=0.01, tries=12, homed=False,
-                                newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0), 
-                                targetTab=self.cobraTargetTable)
+                                newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
