@@ -219,30 +219,62 @@ class cobraTargetTable(object):
         self.interation = 1
         self.calibModel = calibModel
 
-    def makeTargetTable(self, targets, targetThetas, targetPhis):
-        
-        table = {'pfs_visit_id': np.zeros(2394)+self.visitid,
-                'iteration':  np.zeros(2394)+self.interation,
-                'cobra_id': np.arange(2394)+1,
-                'pfs_config_id': np.arange(2394)+1,
-                'pfi_nominal_x_mm': self.calibModel.centers.real,
-                'pfi_nominal_y_mm': self.calibModel.centers.imag,
-                'pfi_target_x_mm' : targets.real,
-                'pfi_target_y_mm' : targets.imag,
-                'motor_target_theta': targetThetas,
-                'motor_target_phi': targetPhis,
-                
-        }
-        
-        self.dataTable = table
-        self.iteration = self.iteration + 1
-       
-    def writeTaegetTable(self):
-        
-        df = pd.DataFrame(data=self.dataTable)
-        self._dbConn.insert("cobra_target", df)
+    def makeTargetTable(self, moves, goodIdx):
 
-    def __del__(self):
-        if self.conn is not None:
-            self.conn.close()
-        pass
+        pfs_config_id = 0
+
+        firstStepMove =  moves['position'][:,0]
+        firstThetaAngle = moves['thetaAngle'][:,0]
+        firstPhiAngle = moves['phiAngle'][:,0]
+
+
+
+        targetStepMove =  moves['position'][:,2]
+        targetThetaAngle = moves['thetaAngle'][:,2]
+        targetPhiAngle = moves['phiAngle'][:,2]
+        
+        targetTable = {'pfs_visit_id':[],
+                    'iteration':[],
+                    'cobra_id':[],
+                    'pfs_config_id':[],
+                    'pfi_nominal_x_mm':[],
+                    'pfi_nominal_y_mm':[],
+                    'pfi_target_x_mm' :[],
+                    'pfi_target_y_mm':[],
+                    'motor_target_theta':[],
+                    'motor_target_phi':[],
+            }
+
+        for iteration in range(self.tries):
+            for idx in range(len(goodIdx)):
+                targetTable['pfs_visit_id'].append(self.visitid)
+                targetTable['pfs_config_id'].append(pfs_config_id)
+
+                targetTable['cobra_id'].append(goodIdx[idx]+1)
+                targetTable['iteration'].append(iteration+1)
+
+                targetTable['pfi_nominal_x_mm'].append(self.calibModel.centers[goodIdx[idx]].real)
+                targetTable['pfi_nominal_y_mm'].append(self.calibModel.centers[goodIdx[idx]].imag)
+
+
+                if iteration < 2:
+                    targetTable['pfi_target_x_mm'].append(firstStepMove[idx].real)
+                    targetTable['pfi_target_y_mm'].append(firstStepMove[idx].imag)
+                    targetTable['motor_target_theta'].append(firstThetaAngle[idx])
+                    targetTable['motor_target_phi'].append(firstPhiAngle[idx])
+                else:
+                    targetTable['pfi_target_x_mm'].append(targetStepMove[idx].real)
+                    targetTable['pfi_target_y_mm'].append(targetStepMove[idx].imag)
+                    targetTable['motor_target_theta'].append(targetThetaAngle[idx])
+                    targetTable['motor_target_phi'].append(targetPhiAngle[idx])
+
+        self.dataTable = pd.DataFrame(targetTable)
+        
+        return self.dataTable
+
+    def writeTargetTable(self):
+        
+        self._dbConn.insert("cobra_target", dataTable)
+
+    #def __del__(self):
+    #    pass
