@@ -219,7 +219,8 @@ class cobraTargetTable(object):
         self.interation = 1
         self.calibModel = calibModel
 
-    def makeTargetTable(self, moves, goodIdx):
+    def makeTargetTable(self, moves, cobraCoach):
+        cc = cobraCoach
 
         pfs_config_id = 0
 
@@ -246,27 +247,35 @@ class cobraTargetTable(object):
             }
 
         for iteration in range(self.tries):
-            for idx in range(len(goodIdx)):
+            for idx in range(cc.nCobras):
                 targetTable['pfs_visit_id'].append(self.visitid)
                 targetTable['pfs_config_id'].append(pfs_config_id)
 
-                targetTable['cobra_id'].append(goodIdx[idx]+1)
+                targetTable['cobra_id'].append(idx+1)
                 targetTable['iteration'].append(iteration+1)
 
-                targetTable['pfi_nominal_x_mm'].append(self.calibModel.centers[goodIdx[idx]].real)
-                targetTable['pfi_nominal_y_mm'].append(self.calibModel.centers[goodIdx[idx]].imag)
+                targetTable['pfi_nominal_x_mm'].append(self.calibModel.centers[idx].real)
+                targetTable['pfi_nominal_y_mm'].append(self.calibModel.centers[idx].imag)
 
+                if idx in cc.badIdx:
+                    # Using cobra center for bad cobra targets
+                    targetTable['pfi_target_x_mm'].append(self.calibModel.centers[idx].real)
+                    targetTable['pfi_target_y_mm'].append(self.calibModel.centers[idx].imag)
 
-                if iteration < 2:
-                    targetTable['pfi_target_x_mm'].append(firstStepMove[idx].real)
-                    targetTable['pfi_target_y_mm'].append(firstStepMove[idx].imag)
-                    targetTable['motor_target_theta'].append(firstThetaAngle[idx])
-                    targetTable['motor_target_phi'].append(firstPhiAngle[idx])
-                else:
-                    targetTable['pfi_target_x_mm'].append(targetStepMove[idx].real)
-                    targetTable['pfi_target_y_mm'].append(targetStepMove[idx].imag)
-                    targetTable['motor_target_theta'].append(targetThetaAngle[idx])
-                    targetTable['motor_target_phi'].append(targetPhiAngle[idx])
+                    targetTable['motor_target_theta'].append(0)
+                    targetTable['motor_target_phi'].append(0)
+
+                else: 
+                    if iteration < 2:
+                        targetTable['pfi_target_x_mm'].append(firstStepMove[cc.goodIdx == idx].real[0])
+                        targetTable['pfi_target_y_mm'].append(firstStepMove[cc.goodIdx == idx].imag[0])
+                        targetTable['motor_target_theta'].append(firstThetaAngle[cc.goodIdx == idx][0])
+                        targetTable['motor_target_phi'].append(firstPhiAngle[cc.goodIdx == idx][0])
+                    else:
+                        targetTable['pfi_target_x_mm'].append(targetStepMove[cc.goodIdx == idx].real[0])
+                        targetTable['pfi_target_y_mm'].append(targetStepMove[cc.goodIdx == idx].imag[0])
+                        targetTable['motor_target_theta'].append(targetThetaAngle[cc.goodIdx == idx][0])
+                        targetTable['motor_target_phi'].append(targetPhiAngle[cc.goodIdx == idx][0])
 
         self.dataTable = pd.DataFrame(targetTable)
         
@@ -274,7 +283,7 @@ class cobraTargetTable(object):
 
     def writeTargetTable(self):
         
-        self._dbConn.insert("cobra_target", dataTable)
+        self._dbConn.insert("cobra_target", self.dataTable)
 
     #def __del__(self):
     #    pass
