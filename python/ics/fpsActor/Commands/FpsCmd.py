@@ -54,7 +54,7 @@ class FpsCmd(object):
         self.actor = actor
 
         self.nv = najaVenator.NajaVenator()
-
+        
         self.tranMatrix = None
         # Declare the commands we implement. When the actor is started
         # these are registered with the parser, which will call the
@@ -1020,6 +1020,18 @@ class FpsCmd(object):
 
         thetas = thetaSolution[:,0]
         phis = phiSolution[:,0]
+        
+        # Here we start to deal with target table
+        cmd.inform(f'text="Handling the cobra target table."')
+        traj, moves = eng.createTrajectory(self.cc.goodIdx, thetas, phis, tries=12, 
+            twoSteps=True, threshold=2.0, timeStep=500)
+        
+        targetTable = traj.calculateFiberPositions(self.cc)
+
+        cobraTargetTable = najaVenator.cobraTargetTable(visit, 12, self.cc.calibModel)
+        cobraTargetTable.makeTargetTable(moves,self.cc)
+        cobraTargetTable.writeTargetTable()
+        
         # adjust theta angles that is too closed to the CCW hard stops
         thetaMarginCCW=0.1
         thetas[thetas < thetaMarginCCW] += np.pi*2
