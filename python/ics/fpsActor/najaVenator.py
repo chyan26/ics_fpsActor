@@ -220,6 +220,12 @@ class cobraTargetTable(object):
         self.calibModel = calibModel
 
     def makeTargetTable(self, moves, cobraCoach):
+        """
+        Make the target table for the convergence move.
+
+        
+        """
+        
         cc = cobraCoach
 
         pfs_config_id = 0
