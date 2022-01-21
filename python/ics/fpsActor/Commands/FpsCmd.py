@@ -20,7 +20,7 @@ import pandas as pd
 import cv2
 from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
-import ics.mcsActor.mcsRoutines.mcsRoutines as mcsTools
+import mcsActor.mcsRoutines.mcsRoutines as mcsTools
 
 from copy import deepcopy
 
