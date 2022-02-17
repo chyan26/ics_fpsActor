@@ -218,7 +218,17 @@ class cobraTargetTable(object):
 
         self.interation = 1
         self.calibModel = calibModel
+    
+    def makeHomeTable(self, centers):
+        """ Making a target table using cobra home locatios."""
+        pass
 
+
+    def makeMotorMapTable(self):
+         """ Making a target table for motor map operations."""
+        pass
+    
+    
     def makeTargetTable(self, moves, cobraCoach):
         """
         Make the target table for the convergence move.
