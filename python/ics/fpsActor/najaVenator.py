@@ -21,6 +21,10 @@ class NajaVenator(object):
 
     def __init__(self):
 
+        self.logger = logging.getLogger('cobraCoach')
+        self.logger.setLevel(logging.INFO)
+
+
         self.db = 'db-ics'
         self._conn = None
 
@@ -221,11 +225,27 @@ class cobraTargetTable(object):
     
     def makeHomeTable(self, centers):
         """ Making a target table using cobra home locatios."""
+        pfs_config_id = 0
+
+
+        targetTable = {'pfs_visit_id':np.repeat(visitId,2394),
+                    'iteration':np.repeat(iteration,2394),
+                    'cobra_id':np.arange(2394)+1,
+                    'pfs_config_id':np.repeat(pfs_config_id,2394),
+                    'pfi_nominal_x_mm':centers.real,
+                    'pfi_nominal_y_mm':centers.imag,
+                    'pfi_target_x_mm': mpos.real,
+                    'pfi_target_y_mm':mpos.imag,
+                    'motor_target_theta':np.repeat(0,2394),
+                    'motor_target_phi':np.repeat(0,2394),
+            }
+        
         pass
 
 
     def makeMotorMapTable(self):
-         """ Making a target table for motor map operations."""
+        """ Making a target table for motor map operations."""
+        self.logger.info(f"Making target table for motor map")
         pass
     
     
