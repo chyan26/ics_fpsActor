@@ -5,7 +5,7 @@ count=40
 exptime=0.8
 
 oneCmd.py fps moveToHome all
-oneCmd.py iic moveToPfsDesign designId=0x5bd5bf39f8061a9a
+oneCmd.py iic moveToPfsDesign designId=0xa15241030541102
 
 oneCmd.py mcs expose object exptime=$exptime doFibreID
 for i in `seq $count`; do
