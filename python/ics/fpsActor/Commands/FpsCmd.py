@@ -615,7 +615,7 @@ class FpsCmd(object):
             self.logger.info(f'Running PHI SLOW motor map.')
             newXml = f'{day}-phi-slow.xml'
             runDir, bad = eng.makePhiMotorMaps(
-                newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False, force=forceMove)
+                newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -624,7 +624,7 @@ class FpsCmd(object):
                 self.logger.info(f'Running PHI Fast motor map.')
                 newXml = f'{day}-phi-final.xml'
                 runDir, bad = eng.makePhiMotorMaps(
-                    newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True, force=forceMove)
+                    newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True)
 
         else:
             eng.setThetaMode()
