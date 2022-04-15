@@ -152,6 +152,11 @@ class FpsCmd(object):
         if self.cc is not None:
             eng.setCobraCoach(self.cc)
 
+        # Define some parameters for cobra operation
+        self.totalPhiSteps = 6000
+        self.totalThetaSteps = 10000
+ 
+        
     # .cc and .db live in the actor, so that we can reload safely.
     @property
     def cc(self):
@@ -614,8 +619,15 @@ class FpsCmd(object):
 
             self.logger.info(f'Running PHI SLOW motor map.')
             newXml = f'{day}-phi-slow.xml'
+
+            # Inserting cobra_target table before actual operation
+            iteration = self.totalPhiSteps // steps
+            cobraTargetTable = najaVenator.cobraTargetTable(visit, iteration+1, self.cc.calibModel)
+            cobraTargetTable.makeMotorMapTable(self.cc)
+            cobraTargetTable.writeTargetTable()
+
             runDir, bad = eng.makePhiMotorMaps(
-                newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False, force=forceMove)
+                newXml, steps=steps, totalSteps=self.totalPhiSteps, repeat=repeat, fast=False, force=forceMove)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -624,7 +636,7 @@ class FpsCmd(object):
                 self.logger.info(f'Running PHI Fast motor map.')
                 newXml = f'{day}-phi-final.xml'
                 runDir, bad = eng.makePhiMotorMaps(
-                    newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True, force=forceMove)
+                    newXml, steps=steps, totalSteps=self.totalPhiSteps, repeat=repeat, fast=True, force=forceMove)
 
         else:
             eng.setThetaMode()
@@ -633,8 +645,15 @@ class FpsCmd(object):
 
             self.logger.info(f'Running THETA SLOW motor map.')
             newXml = f'{day}-theta-slow.xml'
+
+            # Inserting cobra_target table before actual operation
+            iteration = self.totalPhiSteps // steps
+            cobraTargetTable = najaVenator.cobraTargetTable(visit, iteration+1, self.cc.calibModel)
+            cobraTargetTable.makeMotorMapTable(self.cc)
+            cobraTargetTable.writeTargetTable()
+
             runDir, bad = eng.makeThetaMotorMaps(
-                newXml, totalSteps=10000, repeat=repeat, steps=steps, delta=delta, fast=False, force=forceMove)
+                newXml, totalSteps=self.totalThetaSteps, repeat=repeat, steps=steps, delta=delta, fast=False, force=forceMove)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -643,19 +662,24 @@ class FpsCmd(object):
                 self.logger.info(f'Running THETA FAST motor map.')
                 newXml = f'{day}-theta-final.xml'
                 runDir, bad = eng.makeThetaMotorMaps(
-                    newXml, repeat=repeat, steps=steps, delta=delta, fast=True, force=forceMove)
+                    newXml, totalSteps=self.totalThetaSteps, repeat=repeat, steps=steps, delta=delta, fast=True, force=forceMove)
 
         cmd.finish(f'Motor map sequence finished')
 
     def moveToHome(self, cmd):
         cmdKeys = cmd.cmd.keywords
 
-        self.actor.visitor.setOrGetVisit(cmd)
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         allfiber = 'all' in cmdKeys
 
+        # Write center positions as target table
+        cobraTargetTable = najaVenator.cobraTargetTable(visit, 1, self.cc.calibModel)
+        cobraTargetTable.makeHomeTable(self.cc.calibModel.centers)
+        cobraTargetTable.writeTargetTable()
+        
         if phi is True:
             eng.setPhiMode()
             self.cc.moveToHome(self.cc.goodCobras, phiEnable=True)
@@ -1034,7 +1058,8 @@ class FpsCmd(object):
                               % (np.pi*2) + np.pi)
         self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=thetaHome, phiAngles=0)
 
-        targetTable = traj.calculateFiberPositions(self.cc)
+        # If we want to know the path in timeStep resolution, uncomment the next line
+        #targetTable = traj.calculateFiberPositions(self.cc)
 
         cobraTargetTable = najaVenator.cobraTargetTable(visit, 12, self.cc.calibModel)
         cobraTargetTable.makeTargetTable(moves,self.cc)

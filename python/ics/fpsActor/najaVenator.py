@@ -224,7 +224,7 @@ class cobraTargetTable(object):
         self.calibModel = calibModel
     
     def makeHomeTable(self, centers):
-        """ Making a target table using cobra home locatios."""
+        """ Making a target table using cobra home locations."""
         pfs_config_id = 0
 
 
@@ -234,19 +234,52 @@ class cobraTargetTable(object):
                     'pfs_config_id':np.repeat(pfs_config_id,2394),
                     'pfi_nominal_x_mm':centers.real,
                     'pfi_nominal_y_mm':centers.imag,
-                    'pfi_target_x_mm': mpos.real,
-                    'pfi_target_y_mm':mpos.imag,
+                    'pfi_target_x_mm': centers.real,
+                    'pfi_target_y_mm':centers.imag,
                     'motor_target_theta':np.repeat(0,2394),
                     'motor_target_phi':np.repeat(0,2394),
             }
         
-        pass
+        self.dataTable = pd.DataFrame(targetTable)
+        
+        return self.dataTable
 
 
-    def makeMotorMapTable(self):
+
+    def makeMotorMapTable(self, cobraCoach):
         """ Making a target table for motor map operations."""
         self.logger.info(f"Making target table for motor map")
-        pass
+        
+        cc = cobraCoach
+        
+        targetTable = {'pfs_visit_id':[],
+                    'iteration':[],
+                    'cobra_id':[],
+                    'pfs_config_id':[],
+                    'pfi_nominal_x_mm':[],
+                    'pfi_nominal_y_mm':[],
+                    'pfi_target_x_mm' :[],
+                    'pfi_target_y_mm':[],
+                    'motor_target_theta':[],
+                    'motor_target_phi':[],
+            }
+        for iteration in range(self.tries):
+            for idx in range(cc.nCobras):
+                targetTable['pfs_visit_id'].append(self.visitid)
+                targetTable['pfs_config_id'].append(pfs_config_id)
+
+                targetTable['cobra_id'].append(idx+1)
+                targetTable['iteration'].append(iteration+1)
+
+                targetTable['pfi_nominal_x_mm'].append(self.calibModel.centers[idx].real)
+                targetTable['pfi_nominal_y_mm'].append(self.calibModel.centers[idx].imag)
+
+                targetTable['pfi_target_x_mm'].append(self.calibModel.centers[idx].real)
+                targetTable['pfi_target_y_mm'].append(self.calibModel.centers[idx].imag)
+        
+        self.dataTable = pd.DataFrame(targetTable)
+        
+        return self.dataTable
     
     
     def makeTargetTable(self, moves, cobraCoach):
