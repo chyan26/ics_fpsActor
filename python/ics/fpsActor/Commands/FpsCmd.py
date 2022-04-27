@@ -85,8 +85,8 @@ class FpsCmd(object):
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
-            # ('gotoVerticalFromPhi60', '[<visit>]', self.gotoVerticalFromPhi60),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
+            ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<visit>]', self.makeMotorMapwithDots),
             ('makeOntimeMap', '@(phi|theta) [<visit>]', self.makeOntimeMap),
             ('angleConverge', '@(phi|theta) <angleTargets> [<visit>]', self.angleConverge),
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
@@ -576,6 +576,54 @@ class FpsCmd(object):
         self.cc.pfi.moveSteps(cobras, thetaSteps, phiSteps, thetaFast=False, phiFast=False)
 
         cmd.finish(f'text="cobraMoveSteps stepsize = {stepsize} completed"')
+    
+    def makeMotorMapwithDots(self, cmd):
+        """ 
+            Making theta and phi motor map in three groups for avoiding dots.
+        """
+        cmdKeys = cmd.cmd.keywords
+
+        repeat = cmd.cmd.keywords['repeat'].values[0]
+        stepsize = cmd.cmd.keywords['stepsize'].values[0]
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+
+        slowMap = 'slowMap' in cmdKeys
+        fastMap = 'fastMap' in cmdKeys
+   
+
+        # Switch from default no centroids to default do centroids
+        phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+
+        day = time.strftime('%Y-%m-%d')
+        if phi is True:
+            cmd.inform(f'text="Build phi motor map in groups for avoiding dots"')
+            
+
+            if slowMap is True:
+                
+                newXml = f'{day}-phi-slow.xml'
+                cmd.inform(f'text="Slow motor map is {newXml}"')    
+                eng.buildPhiMotorMaps(newXml, steps=stepsize, repeat=repeat, fast=False, tries=12, homed=True)
+                
+            if fastMap is True:
+                newXml = f'{day}-phi-fast.xml'
+                cmd.inform(f'text="Fast motor map is {newXml}"')    
+
+        if theta is True:
+            cmd.inform(f'text="Build theta motor map in groups for avoiding dots"')
+
+            if slowMap is True:
+                newXml = f'{day}-theta-slow.xml'
+                cmd.inform(f'text="Slow motor map is {newXml}"')    
+
+            if fastMap is True:
+                newXml = f'{day}-theta-fast.xml'
+                cmd.inform(f'text="Fast motor map is {newXml}"')    
+
+
+        cmd.finish(f'Motor map sequence finished')
+
 
     def makeMotorMap(self, cmd):
         """ Making motor map. """
@@ -1154,112 +1202,6 @@ class FpsCmd(object):
         self.testIteration(cmd, doFinish=False)
         cmd.finish(f'text="dot move done"')
 
-    def getAEfromFF(self, cmd, frameId):
-        """ Checking distortion with fidicial fibers.  """
-
-        #frameId= frameID
-        moveId = 1
-
-        offset = [0, -85]
-        rotCent = [[4471], [2873]]
-
-        telInform = self.nv.readTelescopeInform(frameId)
-        za = 90-telInform['azi']
-        inr = telInform['instrot']
-
-        inr = inr-180
-        if(inr < 0):
-            inr = inr+360
-
-        mcsData = self.nv.readCentroid(frameId, moveId)
-        ffData = self.nv.readFFConfig()
-        #sfData = self.nv.readCobraConfig()
-
-        ffData['x'] -= offset[0]
-        ffData['y'] -= offset[1]
-
-        # correect input format
-        xyin = np.array([mcsData['centroidx'], mcsData['centroidy']])
-
-        # call the routine
-        xyout = CoordTransp.CoordinateTransform(xyin, za, 'mcs_pfi', inr=inr, cent=rotCent)
-
-        mcsData['pfix'] = xyout[0]
-        mcsData['pfiy'] = xyout[1]
-
-        #d = {'ffID': np.arange(len(xyout[0])), 'pfix': xyout[0], 'pfiy': xyout[1]}
-        # transPos=pd.DataFrame(data=d)
-
-        match = self._findHomes(ffData, mcsData)
-
-        pts1 = np.zeros((1, len(match['orix']), 2))
-        pts2 = np.zeros((1, len(match['orix']), 2))
-
-        pts1[0, :, 0] = match['orix']
-        pts1[0, :, 1] = match['oriy']
-
-        pts2[0, :, 0] = match['pfix']
-        pts2[0, :, 1] = match['pfiy']
-
-        afCoeff, inlier = cv2.estimateAffinePartial2D(pts2, pts1)
-
-        mat = {}
-        mat['affineCoeff'] = afCoeff
-        mat['xTrans'] = afCoeff[0, 2]
-        mat['yTrans'] = afCoeff[1, 2]
-        mat['xScale'] = np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2)
-        mat['yScale'] = np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2)
-        mat['angle'] = np.arctan2(afCoeff[1, 0]/np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2),
-                                  afCoeff[1, 1]/np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2))
-
-        self.tranMatrix = mat
-
-    def applyAEonCobra(self, cmd, frameId):
-
-        #frameId= 16493
-        moveId = 1
-
-        offset = [0, -85]
-        rotCent = [[4471], [2873]]
-
-        telInform = self.nv.readTelescopeInform(frameId)
-        za = 90-telInform['azi']
-        inr = telInform['instrot']
-        inr = inr-180
-        if(inr < 0):
-            inr = inr+360
-
-        mcsData = self.nv.readCentroid(frameId, moveId)
-        sfData = self.nv.readCobraConfig()
-
-        sfData['x'] -= offset[0]
-        sfData['y'] -= offset[1]
-
-        # correect input format
-        xyin = np.array([mcsData['centroidx'], mcsData['centroidy']])
-
-        # call the routine
-        xyout = CoordTransp.CoordinateTransform(xyin, za, 'mcs_pfi', inr=inr, cent=rotCent)
-
-        mcsData['pfix'] = xyout[0]
-        mcsData['pfiy'] = xyout[1]
-
-        pts2 = np.zeros((1, len(xyout[1]), 2))
-
-        pts2[0, :, 0] = xyout[0]
-        pts2[0, :, 1] = xyout[1]
-
-        afCor = cv2.transform(pts2, self.tranMatrix['affineCoeff'])
-
-        mcsData['pfix'] = afCor[0, :, 0]
-        mcsData['pfiy'] = afCor[0, :, 1]
-
-        match = self._findHomes(sfData, mcsData)
-
-        match['dx'] = match['orix'] - match['pfix']
-        match['dy'] = match['oriy'] - match['pfiy']
-
-        return match
 
     def calculateBoresight(self, cmd):
             
@@ -1286,94 +1228,3 @@ class FpsCmd(object):
         db = self.connectToDB(cmd)
         mcsTools.calcBoresight(db, frameIds, pfsVisitId)
 
-    def calculateBoresightOld(self, cmd):
-        """ Function for calculating the rotation center """
-        cmdKeys = cmd.cmd.keywords
-        if 'frameId' in cmdKeys:
-            frameId = cmdKeys['frameId'].values[0]
-
-        ret = self.actor.cmdr.call(actor='mcs',
-                                   cmdStr=f'calculateBoresight frameId={frameId}',
-                                   forUserCmd=cmd, timeLim=30)
-        if ret.didFail:
-            raise RuntimeError("mcs expose failed")
-
-        db = self.connectToDB(cmd)
-        
-        sql = f'''SELECT * FROM mcs_boresight ORDER BY calculated_at DESC FETCH FIRST ROW ONLY'''
-        df = db.fetch_query(sql)
-        xc=df['mcs_boresight_x_pix'][0]
-        yc=df['mcs_boresight_y_pix'][0]
-
-        cmd.finish(f'mcsBoresight={xc:0.4f},{yc:0.4f}')
-
-    def buildTransMatrix(self, cmd):
-        """ Buiding transformation matrix using FF"""
-        cmdKeys = cmd.cmd.keywords
-        if 'frameId' in cmdKeys:
-            frameId = cmdKeys['frameId'].values[0]
-
-        self.logger.info(f'Build transformation matrix with FF on frame {frameId}')
-
-        # Use this latest matrix as initial guess for automatic calculating.
-        db = self.connectToDB(cmd)
-        sql = f'''SELECT * from mcs_pfi_transformation 
-            WHERE mcs_frame_id < {frameId} ORDER BY mcs_frame_id DESC
-            FETCH FIRST ROW ONLY
-            '''
-        transMatrix = db.fetch_query(sql)
-        scale = transMatrix['x_scale'].values[0]
-        xoffset = transMatrix['x_trans'].values[0]
-        yoffset = transMatrix['y_trans'].values[0]
-        angle = transMatrix['angle'].values[0]
-        self.logger.info(f'Latest matrix = {xoffset} {yoffset} scale = {scale}, angle={angle}')
-
-        # Loading FF from DB
-        ff_f3c = self.nv.readFFConfig()['x'].values+self.nv.readFFConfig()['y'].values*1j
-        rx, ry = fpstool.projectFCtoPixel([ff_f3c.real, ff_f3c.imag], scale, angle, [xoffset, yoffset])
-
-        # Load MCS data from DB
-        self.logger.info(f'Load frame from DB')
-        mcsData = self.nv.readCentroid(frameId)
-
-        target = np.array([rx, ry]).T.reshape((len(rx), 2))
-        source = np.array([mcsData['centroidx'].values, mcsData['centroidy'].values]
-                          ).T.reshape((len(mcsData['centroidx'].values), 2))
-
-        match = fpstool.pointMatch(target, source)
-        ff_mcs = match[:, 0]+match[:, 1]*1j
-
-        mat = fpstool.getAffineFromFF(ff_mcs, ff_f3c)
-
-        dataInfo = {'mcs_frame_id': frameId,
-                    'x_trans': mat['xTrans'],
-                    'y_trans': mat['yTrans'],
-                    'x_scale': mat['xScale'],
-                    'y_scale': mat['yScale'],
-                    'angle': np.rad2deg(mat['angle']),
-                    'calculated_at': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    }
-
-        self.logger.info(
-            f"New matrix = {mat['xTrans']} {mat['yTrans']} scale = {mat['xScale']}, angle={np.rad2deg(mat['angle'])}")
-        try:
-            db.insert('mcs_pfi_transformation', pd.DataFrame(data=dataInfo, index=[0]))
-        except:
-            self.logger.info(f'Updating transformation matrix')
-            db.update('mcs_pfi_transformation', pd.DataFrame(data=dataInfo, index=[0]))
-
-        # Building the camera model
-        self.logger.info(f"Building camera model")
-        f3c_mcs_camModel, mcs_f3c_camModel = fpstool.buildCameraModelFF(ff_mcs, ff_f3c)
-
-        cmd.finish('text="Building tranformation matrix finished"')
-
-    def visCobraSpots(self, cmd):
-        cmdKeys = cmd.cmd.keywords
-        runDir = pathlib.Path(cmd.cmd.keywords['runDir'].values[0])
-        self.logger.info(f'Loading model = {self.xml}')
-        phi = 'phi' in cmdKeys
-        theta = 'theta' in cmdKeys
-
-        if phi:
-            vis.visCobraSpots(runDir, self.xml, arm='phi')
