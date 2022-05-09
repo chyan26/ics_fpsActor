@@ -82,7 +82,8 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
+            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>]', 
+                self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
             ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<cobraGroup>] [<visit>]', self.makeMotorMapwithGroups),
@@ -95,7 +96,7 @@ class FpsCmd(object):
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
             ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
             ('testLoop', '[<visit>] [<expTime>] [<cnt>] [@noMatching]',
-             self.testIteration), # Historical alias.
+                self.testIteration), # Historical alias.
             ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
             ('loadDotScales', '[<filename>]', self.loadDotScales),
@@ -131,6 +132,7 @@ class FpsCmd(object):
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("frameId", types.Int(), help="PFS Frame ID"),
                                         keys.Key("iteration", types.Int(), help="Interation number"),
+                                        keys.Key("tolerance", types.Int(), help="Tolerance distance in mm"),
                                         keys.Key("id", types.Long(),
                                                  help="pfsDesignId, to define the target fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
@@ -1058,6 +1060,19 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
         designId = cmdKeys['designId'].values[0]
+
+
+        # Adding aruments for iteration and tolerance
+        if 'iteration' in cmdKeys:
+            iteration = cmdKeys['iteration'].values[0] 
+        else:
+            iteration = 12
+        
+        if 'tolerance' in cmdKeys:
+            tolerance = cmdKeys['tolerance'].values[0] 
+        else:
+            tolerance = 0.01
+
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
         twoStepsOff = 'twoStepsOff' in cmdKeys
