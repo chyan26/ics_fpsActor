@@ -1073,6 +1073,8 @@ class FpsCmd(object):
         else:
             tolerance = 0.01
 
+        cmd.inform(f'text="Running moveToPfsDeign with tolerance={tolerance} iteration={iteration}"')
+
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
         twoStepsOff = 'twoStepsOff' in cmdKeys
@@ -1143,17 +1145,17 @@ class FpsCmd(object):
             _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
             dataPath, atThetas, atPhis, moves[0,:,:2] = \
-                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.01, 
+                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=tolerance, 
                             tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
                             threshold=2.0,thetaMargin=np.deg2rad(15.0))
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:] = \
-                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=0.01, tries=10, homed=False,
+                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
                                 newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
-                                phis, relative=False, local=True, tolerance=0.01, tries=12, homed=False,
+                                phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
         np.save(dataPath / 'targets', targets)
