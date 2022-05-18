@@ -71,7 +71,6 @@ class FpsCmd(object):
             ('diag', '', self.diag),
             ('hk', '[<board>] [@short]', self.hk),
             ('connect', '', self.connect),
-            ('buildTransMatrix', '[<frameId>]', self.buildTransMatrix),
             ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
@@ -86,14 +85,12 @@ class FpsCmd(object):
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
-            ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<visit>]', self.makeMotorMapwithDots),
+            ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<visit>]', self.makeMotorMapwithGroups),
             ('makeOntimeMap', '@(phi|theta) [<visit>]', self.makeOntimeMap),
             ('angleConverge', '@(phi|theta) <angleTargets> [<visit>]', self.angleConverge),
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
             ('motorOntimeSearch', '@(phi|theta) [<visit>]', self.motorOntimeSearch),
-            ('visCobraSpots', '@(phi|theta) <runDir>', self.visCobraSpots),
             ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
-            #
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
             ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
@@ -577,7 +574,7 @@ class FpsCmd(object):
 
         cmd.finish(f'text="cobraMoveSteps stepsize = {stepsize} completed"')
     
-    def makeMotorMapwithDots(self, cmd):
+    def makeMotorMapwithGroups(self, cmd):
         """ 
             Making theta and phi motor map in three groups for avoiding dots.
         """
@@ -597,7 +594,7 @@ class FpsCmd(object):
 
         day = time.strftime('%Y-%m-%d')
         if phi is True:
-            cmd.inform(f'text="Build phi motor map in groups for avoiding dots"')
+            cmd.inform(f'text="Build phi motor map AT ONCE for avoiding dots"')
             
 
             if slowMap is True:
