@@ -85,7 +85,7 @@ class FpsCmd(object):
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
-            ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<visit>]', self.makeMotorMapwithGroups),
+            ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<cobraGroup>] [<visit>]', self.makeMotorMapwithGroups),
             ('makeOntimeMap', '@(phi|theta) [<visit>]', self.makeOntimeMap),
             ('angleConverge', '@(phi|theta) <angleTargets> [<visit>]', self.angleConverge),
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
@@ -109,6 +109,8 @@ class FpsCmd(object):
                                         keys.Key("angle", types.Int(), help="arm angle"),
                                         keys.Key("designId", types.Long(), help="PFS design ID"),
                                         keys.Key("stepsize", types.Int(), help="step size of motor"),
+                                        keys.Key("cobraGroup", types.Int(), 
+                                                help="cobra group for avoid collision"),
                                         keys.Key("repeat", types.Int(),
                                                  help="number of iteration for motor map generation"),
                                         keys.Key("angleTargets", types.Int(),
@@ -584,6 +586,8 @@ class FpsCmd(object):
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
+        group = cmd.cmd.keywords['cobraGroup'].values[0]
+
         slowMap = 'slowMap' in cmdKeys
         fastMap = 'fastMap' in cmdKeys
    
@@ -613,6 +617,8 @@ class FpsCmd(object):
             if slowMap is True:
                 newXml = f'{day}-theta-slow.xml'
                 cmd.inform(f'text="Slow motor map is {newXml}"')    
+                eng.buildThetaMotorMaps(newXml, steps=stepsize, group=group, repeat=repeat, 
+                    fast=False, tries=12, homed=True)
 
             if fastMap is True:
                 newXml = f'{day}-theta-fast.xml'
