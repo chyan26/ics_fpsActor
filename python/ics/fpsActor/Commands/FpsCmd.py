@@ -84,7 +84,7 @@ class FpsCmd(object):
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
-            ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
+            ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
             ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<cobraGroup>] [<visit>]', self.makeMotorMapwithGroups),
             ('makeOntimeMap', '@(phi|theta) [<visit>]', self.makeOntimeMap),
             ('angleConverge', '@(phi|theta) <angleTargets> [<visit>]', self.angleConverge),
@@ -109,6 +109,7 @@ class FpsCmd(object):
                                         keys.Key("angle", types.Int(), help="arm angle"),
                                         keys.Key("designId", types.Long(), help="PFS design ID"),
                                         keys.Key("stepsize", types.Int(), help="step size of motor"),
+                                        keys.Key("totalsteps", types.Int(), help="total step for motor"),
                                         keys.Key("cobraGroup", types.Int(), 
                                                 help="cobra group for avoid collision"),
                                         keys.Key("repeat", types.Int(),
@@ -635,6 +636,8 @@ class FpsCmd(object):
         # self._connect()
         repeat = cmd.cmd.keywords['repeat'].values[0]
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
+        #totalstep = cmd.cmd.keywords['totalsteps'].values[0]
+        
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
         forceMoveArg = 'forceMove' in cmdKeys
@@ -663,10 +666,15 @@ class FpsCmd(object):
             steps = stepsize
             day = time.strftime('%Y-%m-%d')
 
+            if ('totalsteps' in cmdKeys) is False:
+                totalstep = 6000
+            else:
+                totalstep = cmd.cmd.keywords['totalsteps'].values[0]
+
             self.logger.info(f'Running PHI SLOW motor map.')
             newXml = f'{day}-phi-slow.xml'
             runDir, bad = eng.makePhiMotorMaps(
-                newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=False)
+                newXml, steps=steps, totalSteps=totalsteps, repeat=repeat, fast=False)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -675,17 +683,22 @@ class FpsCmd(object):
                 self.logger.info(f'Running PHI Fast motor map.')
                 newXml = f'{day}-phi-final.xml'
                 runDir, bad = eng.makePhiMotorMaps(
-                    newXml, steps=steps, totalSteps=6000, repeat=repeat, fast=True)
+                    newXml, steps=steps, totalSteps=totalsteps, repeat=repeat, fast=True)
 
         else:
             eng.setThetaMode()
             steps = stepsize
             day = time.strftime('%Y-%m-%d')
 
+             if ('totalsteps' in cmdKeys) is False:
+                totalstep = 10000
+            else:
+                totalstep = cmd.cmd.keywords['totalsteps'].values[0]
+
             self.logger.info(f'Running THETA SLOW motor map.')
             newXml = f'{day}-theta-slow.xml'
             runDir, bad = eng.makeThetaMotorMaps(
-                newXml, totalSteps=10000, repeat=repeat, steps=steps, delta=delta, fast=False, force=forceMove)
+                newXml, totalSteps=totalstep, repeat=repeat, steps=steps, delta=delta, fast=False, force=forceMove)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -694,7 +707,7 @@ class FpsCmd(object):
                 self.logger.info(f'Running THETA FAST motor map.')
                 newXml = f'{day}-theta-final.xml'
                 runDir, bad = eng.makeThetaMotorMaps(
-                    newXml, repeat=repeat, steps=steps, delta=delta, fast=True, force=forceMove)
+                    newXml,totalSteps=totalstep, repeat=repeat, steps=steps, delta=delta, fast=True, force=forceMove)
 
         cmd.finish(f'Motor map sequence finished')
 
