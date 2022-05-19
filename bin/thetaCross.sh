@@ -1,11 +1,11 @@
 #!/bin/bash
 
-steps=-25
+steps=-30
 count=40
 exptime=0.8
 
 oneCmd.py fps moveToHome all
-oneCmd.py iic moveToPfsDesign designId=0x356557ee9790b9d
+oneCmd.py iic moveToPfsDesign designId=0x24b4f9366954d539
 
 oneCmd.py mcs expose object exptime=$exptime doFibreID
 for i in `seq $count`; do
