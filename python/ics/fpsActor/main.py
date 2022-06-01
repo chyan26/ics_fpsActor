@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
-import opscore.utility.sdss3logging
 import actorcore.ICC
+
 
 class Visitor(object):
     def __init__(self, actor):
@@ -24,7 +24,7 @@ class Visitor(object):
         if frameSeq >= 100:
             raise ValueError(f"frameSeq > 100 (would be {self.frameSeq})")
 
-        frameNum = self.visit*100 + frameSeq
+        frameNum = self.visit * 100 + frameSeq
         return frameNum
 
     def setOrGetVisit(self, cmd):
@@ -34,7 +34,10 @@ class Visitor(object):
         cmdKeys = cmd.cmd.keywords
 
         # When we start a new visit, always reset frame counter.
-        self.frameSeq = 0
+        newVisit = 'visit' not in cmdKeys or cmdKeys['visit'].values[0] != self.visit
+        if newVisit:
+            self.frameSeq = 0
+
         if 'visit' in cmdKeys:
             self.visit = cmdKeys['visit'].values[0]
         else:
@@ -45,6 +48,7 @@ class Visitor(object):
             self.visit = self.actor.models['gen2'].keyVarDict['visit'].valueList[0]
 
         return self.visit
+
 
 class Fps(actorcore.ICC.ICC):
     def __init__(self, name, productName=None, debugLevel=30):
@@ -73,6 +77,7 @@ class Fps(actorcore.ICC.ICC):
 
     def getPositionsForFrame(self, frameId):
         return self.cmdSets['FpsCmd'].getPositionsForFrame(frameId)
+
 
 def main():
     fps = Fps('fps', 'fpsActor')
