@@ -665,16 +665,12 @@ class FpsCmd(object):
             eng.setPhiMode()
             steps = stepsize
             day = time.strftime('%Y-%m-%d')
-
-            if ('totalsteps' in cmdKeys) is False:
-                totalstep = 6000
-            else:
-                totalstep = cmd.cmd.keywords['totalsteps'].values[0]
+            totalSteps = cmdKeys['totalsteps'].values[0] if 'totalsteps' in cmdKeys else 6000
 
             self.logger.info(f'Running PHI SLOW motor map.')
             newXml = f'{day}-phi-slow.xml'
             runDir, bad = eng.makePhiMotorMaps(
-                newXml, steps=steps, totalSteps=totalsteps, repeat=repeat, fast=False)
+                newXml, steps=steps, totalSteps=totalSteps, repeat=repeat, fast=False)
 
             self.xml = pathlib.Path(f'{runDir}/output/{newXml}')
             self.cc.pfi.loadModel([self.xml])
@@ -683,14 +679,14 @@ class FpsCmd(object):
                 self.logger.info(f'Running PHI Fast motor map.')
                 newXml = f'{day}-phi-final.xml'
                 runDir, bad = eng.makePhiMotorMaps(
-                    newXml, steps=steps, totalSteps=totalsteps, repeat=repeat, fast=True)
+                    newXml, steps=steps, totalSteps=totalSteps, repeat=repeat, fast=True)
 
         else:
             eng.setThetaMode()
             steps = stepsize
             day = time.strftime('%Y-%m-%d')
 
-             if ('totalsteps' in cmdKeys) is False:
+            if ('totalsteps' in cmdKeys) is False:
                 totalstep = 10000
             else:
                 totalstep = cmd.cmd.keywords['totalsteps'].values[0]
