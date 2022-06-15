@@ -82,7 +82,8 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>]', self.moveToPfsDesign),
+            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>]', 
+                self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
             ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<cobraGroup>] [<visit>]', self.makeMotorMapwithGroups),
@@ -95,7 +96,7 @@ class FpsCmd(object):
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
             ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
             ('testLoop', '[<visit>] [<expTime>] [<cnt>] [@noMatching]',
-             self.testIteration), # Historical alias.
+                self.testIteration), # Historical alias.
             ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
             ('loadDotScales', '[<filename>]', self.loadDotScales),
@@ -131,6 +132,7 @@ class FpsCmd(object):
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("frameId", types.Int(), help="PFS Frame ID"),
                                         keys.Key("iteration", types.Int(), help="Interation number"),
+                                        keys.Key("tolerance", types.Int(), help="Tolerance distance in mm"),
                                         keys.Key("id", types.Long(),
                                                  help="pfsDesignId, to define the target fiber positions"),
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
@@ -1058,6 +1060,21 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
         designId = cmdKeys['designId'].values[0]
+
+
+        # Adding aruments for iteration and tolerance
+        if 'iteration' in cmdKeys:
+            iteration = cmdKeys['iteration'].values[0] 
+        else:
+            iteration = 12
+        
+        if 'tolerance' in cmdKeys:
+            tolerance = cmdKeys['tolerance'].values[0] 
+        else:
+            tolerance = 0.01
+
+        cmd.inform(f'text="Running moveToPfsDeign with tolerance={tolerance} iteration={iteration}"')
+
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
         twoStepsOff = 'twoStepsOff' in cmdKeys
@@ -1128,17 +1145,17 @@ class FpsCmd(object):
             _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
             dataPath, atThetas, atPhis, moves[0,:,:2] = \
-                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=0.01, 
+                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=tolerance, 
                             tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
                             threshold=2.0,thetaMargin=np.deg2rad(15.0))
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:] = \
-                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=0.01, tries=10, homed=False,
+                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
                                 newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
-                                phis, relative=False, local=True, tolerance=0.01, tries=12, homed=False,
+                                phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
         np.save(dataPath / 'targets', targets)
