@@ -36,7 +36,7 @@ from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
 from ics.fpsActor.utils import display as vis
-from ics.fpsActor.utils import designHandle
+from ics.fpsActor.utils import designHandle as designFileHandle
 from ics.fpsActor.utils import pfsDesign
 
 reload(vis)
@@ -46,7 +46,7 @@ reload(pfiControl)
 reload(cobraCoach)
 reload(najaVenator)
 reload(eng)
-reload(designHandle)
+reload(designFileHandle)
 reload(pfsDesign)
 
 
@@ -1094,7 +1094,7 @@ class FpsCmd(object):
 
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
-        designHandle=designHandle.DesignFileHandle(designId, maskFile=maskFile)
+        designHandle = designFileHandle.DesignFileHandle(designId, maskFile=maskFile)
         
         # Loading mask file when it is given.
         if maskFile is not None:
