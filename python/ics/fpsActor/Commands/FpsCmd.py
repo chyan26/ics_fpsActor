@@ -36,7 +36,7 @@ from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
 from ics.fpsActor.utils import display as vis
-
+from ics.fpsActor.utils import designHandle
 from ics.fpsActor.utils import pfsDesign
 
 reload(vis)
@@ -46,7 +46,10 @@ reload(pfiControl)
 reload(cobraCoach)
 reload(najaVenator)
 reload(eng)
+reload(designHandle)
 reload(pfsDesign)
+
+
 
 class FpsCmd(object):
     def __init__(self, actor):
