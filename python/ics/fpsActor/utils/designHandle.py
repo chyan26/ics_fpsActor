@@ -2,21 +2,21 @@ from ics.fpsActor.utils import pfsDesign
 import pathlib
 import pandas as pd
 
-class designFileHandle():
+class DesignFileHandle():
     def __init__(self, designId, maskFile = None):
      
         self.maskFile = None
         if maskFile is not None:
             self.maskFile = maskFile
-        
+        self.designId = designId
         self.targets = None
         self.goodIdx = None
         self.badIdx = None
         
         self._loadTargets()
         
-    def loadTargets(self):
-        targetPos = pfsDesign.loadPfsDesign(designId)
+    def _loadTargets(self):
+        targetPos = pfsDesign.loadPfsDesign(self.designId)
         targets = targetPos[:,0]+targetPos[:,1]*1j
         
         self.targets = targets
