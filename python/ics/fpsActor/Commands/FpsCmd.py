@@ -1099,16 +1099,18 @@ class FpsCmd(object):
         # Loading mask file when it is given.
         if maskFile is not None:
             designHandle.loadMask()
-            self.cc.goodIdx = designHandle.goodIdx
-            self.cc.badIdx = designHandle.badIdx
-
-        targets = designHandle.targets
+            goodIdx = designHandle.goodIdx
+            badIdx = designHandle.badIdx
+        else:
+            goodIdx = self.cc.goodIdx
+            badIdx = self.cc.badIdx
         
         #targetPos = pfsDesign.loadPfsDesign(designId)
         #targets = targetPos[:,0]+targetPos[:,1]*1j
-        #targets = targets[self.cc.goodIdx]
-
-        cobras = self.cc.allCobras[self.cc.goodIdx]
+        #targets = targets[goodIdx]
+        
+        targets = designHandle.targets[goodIdx]
+        cobras = self.cc.allCobras[goodIdx]
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
         valid = (flags[:,0] & self.cc.pfi.SOLUTION_OK) != 0
         if not np.all(valid):
@@ -1120,8 +1122,7 @@ class FpsCmd(object):
         # Here we start to deal with target table
         self.cc.trajectoryMode = True
         cmd.inform(f'text="Handling the cobra target table."')
-        traj, moves = eng.createTrajectory(self.cc.goodIdx, thetas, phis, tries=12, 
-            twoSteps=True, threshold=2.0, timeStep=500)
+        traj, moves = eng.createTrajectory(goodIdx, thetas, phis, tries=12, twoSteps=True, threshold=2.0, timeStep=500)
 
         cmd.inform(f'text="Reset the current angles for cobra arms."')
     
@@ -1143,7 +1144,7 @@ class FpsCmd(object):
         self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
         if twoSteps:
-            cIds=self.cc.goodIdx
+            cIds = goodIdx
 
             moves = np.zeros((1, len(cIds), 12), dtype=eng.moveDtype)
             
@@ -1173,7 +1174,7 @@ class FpsCmd(object):
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
                                 newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
-            dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
+            dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(goodIdx, thetas,
                                 phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
