@@ -85,7 +85,7 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>]', 
+            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>] [<maskFile>]', 
                 self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -138,6 +138,7 @@ class FpsCmd(object):
                                         keys.Key("tolerance", types.Int(), help="Tolerance distance in mm"),
                                         keys.Key("id", types.Long(),
                                                  help="pfsDesignId, to define the target fiber positions"),
+                                        keys.Key("maskFile", types.String(), help="mask filename for cobra"),          
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
                                         keys.Key("expTime", types.Float(), help="Seconds for exposure"),
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
@@ -1066,6 +1067,11 @@ class FpsCmd(object):
 
 
         # Adding aruments for iteration and tolerance
+        if 'maskFile' in cmdKeys:
+            maskFile = cmdKeys['maskFile'].values[0]
+        else:
+            maskFile = None
+        
         if 'iteration' in cmdKeys:
             iteration = cmdKeys['iteration'].values[0] 
         else:
@@ -1088,9 +1094,20 @@ class FpsCmd(object):
 
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
-        targetPos = pfsDesign.loadPfsDesign(designId)
-        targets = targetPos[:,0]+targetPos[:,1]*1j
-        targets = targets[self.cc.goodIdx]
+        designHandle=designHandle.DesignFileHandle(designId, maskFile=maskFile)
+        
+        # Loading mask file when it is given.
+        if maekFile is not None:
+            designHandle.loadMask()
+        
+        
+        targets = designHandle.targets
+        self.cc.goodIdx = designHandle.goodIdx
+        self.cc.badIdx = designHandle.badIdx
+
+        #targetPos = pfsDesign.loadPfsDesign(designId)
+        #targets = targetPos[:,0]+targetPos[:,1]*1j
+        #targets = targets[self.cc.goodIdx]
 
         cobras = self.cc.allCobras[self.cc.goodIdx]
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
