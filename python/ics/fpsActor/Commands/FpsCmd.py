@@ -100,7 +100,7 @@ class FpsCmd(object):
             ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
             ('testLoop', '[<visit>] [<expTime>] [<cnt>] [@noMatching]',
                 self.testIteration), # Historical alias.
-            ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
+            ('cobraMoveSteps', '@(phi|theta) <stepsize> [<maskFile>]', self.cobraMoveSteps),
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
             ('loadDotScales', '[<filename>]', self.loadDotScales),
             ('updateDotLoop', '<filename> [<stepsPerMove>] [@noMove]', self.updateDotLoop),
@@ -562,9 +562,11 @@ class FpsCmd(object):
         # Switch from default no centroids to default do centroids
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
+        __, goodIdx, badIdx = self.loadDesignHandle(designId=None, maskFile=maskFile)
 
         #cobraList = np.array([1240,2051,2262,2278,2380,2393])-1
-        cobras = self.cc.allCobras#[cobraList]
+        cobras = self.cc.allCobras[goodIdx]
 
         cmdKeys = cmd.cmd.keywords
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
@@ -1058,6 +1060,21 @@ class FpsCmd(object):
                                                                     totalSteps=15000, repeat=1, scaling=3.0, tolerance=np.deg2rad(3.0))
 
         cmd.finish(f'text="Motor on-time scan is finished."')
+
+    def loadDesignHandle(self, designId, maskFile):
+        """Load designHandle and maskFile."""
+        designHandle = designFileHandle.DesignFileHandle(designId, maskFile=maskFile)
+
+        # Loading mask file when it is given.
+        if maskFile is not None:
+            designHandle.loadMask()
+            goodIdx = designHandle.goodIdx
+            badIdx = designHandle.badIdx
+        else:
+            goodIdx = self.cc.goodIdx
+            badIdx = self.cc.badIdx
+
+        return designHandle, goodIdx, badIdx
     
     def moveToPfsDesign(self,cmd):
         """ Move cobras to a PFS design. """
@@ -1094,16 +1111,7 @@ class FpsCmd(object):
 
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
-        designHandle = designFileHandle.DesignFileHandle(designId, maskFile=maskFile)
-        
-        # Loading mask file when it is given.
-        if maskFile is not None:
-            designHandle.loadMask()
-            goodIdx = designHandle.goodIdx
-            badIdx = designHandle.badIdx
-        else:
-            goodIdx = self.cc.goodIdx
-            badIdx = self.cc.badIdx
+        designHandle, goodIdx, badIdx = self.loadDesignHandle(designId, maskFile)
         
         #targetPos = pfsDesign.loadPfsDesign(designId)
         #targets = targetPos[:,0]+targetPos[:,1]*1j
