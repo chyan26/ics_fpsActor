@@ -1099,12 +1099,12 @@ class FpsCmd(object):
         # Loading mask file when it is given.
         if maekFile is not None:
             designHandle.loadMask()
-        
+            self.cc.goodIdx = designHandle.goodIdx
+            self.cc.badIdx = designHandle.badIdx
+
         
         targets = designHandle.targets
-        self.cc.goodIdx = designHandle.goodIdx
-        self.cc.badIdx = designHandle.badIdx
-
+        
         #targetPos = pfsDesign.loadPfsDesign(designId)
         #targets = targetPos[:,0]+targetPos[:,1]*1j
         #targets = targets[self.cc.goodIdx]
