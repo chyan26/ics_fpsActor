@@ -8,12 +8,19 @@ class designFileHandle():
         self.maskFile = None
         if maskFile is not None:
             self.maskFile = maskFile
+        
+        self.targets = None
         self.goodIdx = None
         self.badIdx = None
         
-    def loadTargets(self):
+        self._loadTargets()
         
-        pass 
+    def loadTargets(self):
+        targetPos = pfsDesign.loadPfsDesign(designId)
+        targets = targetPos[:,0]+targetPos[:,1]*1j
+        
+        self.targets = targets
+ 
     
     def loadMask(self):
         
