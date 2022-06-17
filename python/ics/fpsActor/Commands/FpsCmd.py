@@ -85,7 +85,7 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>] [<maskFile>]', 
+            ('moveToPfsDesign', '<designId> [@engDesign] [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>] [<maskFile>]', 
                 self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -563,7 +563,8 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
-        __, goodIdx, badIdx = self.loadDesignHandle(designId=None, maskFile=maskFile)
+        __, goodIdx, badIdx = self.loadDesignHandle(designId=None, maskFile=maskFile,
+                    calibModel = self.cc.calibModel, fillNaN = False)
 
         #cobraList = np.array([1240,2051,2262,2278,2380,2393])-1
         cobras = self.cc.allCobras[goodIdx]
@@ -1061,9 +1062,13 @@ class FpsCmd(object):
 
         cmd.finish(f'text="Motor on-time scan is finished."')
 
-    def loadDesignHandle(self, designId, maskFile):
+    def loadDesignHandle(self, designId, maskFile, calibModel, fillNaN=False):
         """Load designHandle and maskFile."""
-        designHandle = designFileHandle.DesignFileHandle(designId, maskFile=maskFile)
+        designHandle = designFileHandle.DesignFileHandle(designId, 
+            maskFile=maskFile, calibModel=calibModel)
+
+        if fillNaN is True:
+            designHandle.fillCalibModelCenter()
 
         # Loading mask file when it is given.
         if maskFile is not None:
@@ -1073,7 +1078,9 @@ class FpsCmd(object):
         else:
             goodIdx = self.cc.goodIdx
             badIdx = self.cc.badIdx
-
+        
+        self.logger.info(f"Mask file is {maskFile} badIdx = {badIdx}")
+    
         return designHandle, goodIdx, badIdx
     
     def moveToPfsDesign(self,cmd):
@@ -1108,16 +1115,32 @@ class FpsCmd(object):
             twoSteps = False
         else:
             twoSteps = True
+        
+        engDesign = 'engDesign' in cmdKeys
 
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
-        designHandle, goodIdx, badIdx = self.loadDesignHandle(designId, maskFile)
+         cmd.inform(f'text="Setting good cobra index"')
+        goodIdx = self.cc.goodIdx
+
+
+        if engDesign is True:
+            targetPos = pfsDesign.loadPfsDesign(designId)
+            targets = targetPos[:,0]+targetPos[:,1]*1j
+            targets = targets[goodIdx]
+        else:
+
+            designHandle, goodIdx, badIdx = self.loadDesignHandle(designId, 
+                                        maskFile, self.cc.calibModel,fillNaN=True)
+            targets = designHandle.targets[goodIdx]
+
         
-        #targetPos = pfsDesign.loadPfsDesign(designId)
-        #targets = targetPos[:,0]+targetPos[:,1]*1j
-        #targets = targets[goodIdx]
+        targetPos = pfsDesign.loadPfsDesign(designId)
+        targets = targetPos[:,0]+targetPos[:,1]*1j
+        targets = targets[goodIdx]
         
-        targets = designHandle.targets[goodIdx]
+        #import pdb; pdb.set_trace()
+
         cobras = self.cc.allCobras[goodIdx]
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
         valid = (flags[:,0] & self.cc.pfi.SOLUTION_OK) != 0
@@ -1182,7 +1205,7 @@ class FpsCmd(object):
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
                                 newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
-            dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(goodIdx, thetas,
+            dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(cIds, thetas,
                                 phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
