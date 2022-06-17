@@ -135,7 +135,7 @@ class FpsCmd(object):
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("frameId", types.Int(), help="PFS Frame ID"),
                                         keys.Key("iteration", types.Int(), help="Interation number"),
-                                        keys.Key("tolerance", types.Int(), help="Tolerance distance in mm"),
+                                        keys.Key("tolerance", types.Float(), help="Tolerance distance in mm"),
                                         keys.Key("id", types.Long(),
                                                  help="pfsDesignId, to define the target fiber positions"),
                                         keys.Key("maskFile", types.String(), help="mask filename for cobra"),          
