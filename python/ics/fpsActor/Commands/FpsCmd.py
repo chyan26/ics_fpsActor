@@ -36,7 +36,7 @@ from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
 from ics.fpsActor import fpsFunction as fpstool
 from ics.fpsActor.utils import display as vis
-
+from ics.fpsActor.utils import designHandle as designFileHandle
 from ics.fpsActor.utils import pfsDesign
 
 reload(vis)
@@ -46,7 +46,10 @@ reload(pfiControl)
 reload(cobraCoach)
 reload(najaVenator)
 reload(eng)
+reload(designFileHandle)
 reload(pfsDesign)
+
+
 
 class FpsCmd(object):
     def __init__(self, actor):
@@ -82,7 +85,7 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>]', 
+            ('moveToPfsDesign', '<designId> [@engDesign] [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>] [<maskFile>]', 
                 self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -97,7 +100,7 @@ class FpsCmd(object):
             ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
             ('testLoop', '[<visit>] [<expTime>] [<cnt>] [@noMatching]',
                 self.testIteration), # Historical alias.
-            ('cobraMoveSteps', '@(phi|theta) <stepsize>', self.cobraMoveSteps),
+            ('cobraMoveSteps', '@(phi|theta) <stepsize> [<maskFile>]', self.cobraMoveSteps),
             ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
             ('loadDotScales', '[<filename>]', self.loadDotScales),
             ('updateDotLoop', '<filename> [<stepsPerMove>] [@noMove]', self.updateDotLoop),
@@ -132,9 +135,10 @@ class FpsCmd(object):
                                         keys.Key("visit", types.Int(), help="PFS visit to use"),
                                         keys.Key("frameId", types.Int(), help="PFS Frame ID"),
                                         keys.Key("iteration", types.Int(), help="Interation number"),
-                                        keys.Key("tolerance", types.Int(), help="Tolerance distance in mm"),
+                                        keys.Key("tolerance", types.Float(), help="Tolerance distance in mm"),
                                         keys.Key("id", types.Long(),
                                                  help="pfsDesignId, to define the target fiber positions"),
+                                        keys.Key("maskFile", types.String(), help="mask filename for cobra"),          
                                         keys.Key("mask", types.Int(), help="mask for power and/or reset"),
                                         keys.Key("expTime", types.Float(), help="Seconds for exposure"),
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
@@ -558,9 +562,12 @@ class FpsCmd(object):
         # Switch from default no centroids to default do centroids
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
+        __, goodIdx, badIdx = self.loadDesignHandle(designId=None, maskFile=maskFile,
+                    calibModel = self.cc.calibModel, fillNaN = False)
 
         #cobraList = np.array([1240,2051,2262,2278,2380,2393])-1
-        cobras = self.cc.allCobras#[cobraList]
+        cobras = self.cc.allCobras[goodIdx]
 
         cmdKeys = cmd.cmd.keywords
         stepsize = cmd.cmd.keywords['stepsize'].values[0]
@@ -1054,6 +1061,27 @@ class FpsCmd(object):
                                                                     totalSteps=15000, repeat=1, scaling=3.0, tolerance=np.deg2rad(3.0))
 
         cmd.finish(f'text="Motor on-time scan is finished."')
+
+    def loadDesignHandle(self, designId, maskFile, calibModel, fillNaN=False):
+        """Load designHandle and maskFile."""
+        designHandle = designFileHandle.DesignFileHandle(designId, 
+            maskFile=maskFile, calibModel=calibModel)
+
+        if fillNaN is True:
+            designHandle.fillCalibModelCenter()
+
+        # Loading mask file when it is given.
+        if maskFile is not None:
+            designHandle.loadMask()
+            goodIdx = designHandle.goodIdx
+            badIdx = designHandle.badIdx
+        else:
+            goodIdx = self.cc.goodIdx
+            badIdx = self.cc.badIdx
+        
+        self.logger.info(f"Mask file is {maskFile} badIdx = {badIdx}")
+    
+        return designHandle, goodIdx, badIdx
     
     def moveToPfsDesign(self,cmd):
         """ Move cobras to a PFS design. """
@@ -1063,6 +1091,11 @@ class FpsCmd(object):
 
 
         # Adding aruments for iteration and tolerance
+        if 'maskFile' in cmdKeys:
+            maskFile = cmdKeys['maskFile'].values[0]
+        else:
+            maskFile = None
+        
         if 'iteration' in cmdKeys:
             iteration = cmdKeys['iteration'].values[0] 
         else:
@@ -1082,14 +1115,33 @@ class FpsCmd(object):
             twoSteps = False
         else:
             twoSteps = True
+        
+        engDesign = 'engDesign' in cmdKeys
 
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
+         cmd.inform(f'text="Setting good cobra index"')
+        goodIdx = self.cc.goodIdx
+
+
+        if engDesign is True:
+            targetPos = pfsDesign.loadPfsDesign(designId)
+            targets = targetPos[:,0]+targetPos[:,1]*1j
+            targets = targets[goodIdx]
+        else:
+
+            designHandle, goodIdx, badIdx = self.loadDesignHandle(designId, 
+                                        maskFile, self.cc.calibModel,fillNaN=True)
+            targets = designHandle.targets[goodIdx]
+
+        
         targetPos = pfsDesign.loadPfsDesign(designId)
         targets = targetPos[:,0]+targetPos[:,1]*1j
-        targets = targets[self.cc.goodIdx]
+        targets = targets[goodIdx]
+        
+        #import pdb; pdb.set_trace()
 
-        cobras = self.cc.allCobras[self.cc.goodIdx]
+        cobras = self.cc.allCobras[goodIdx]
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
         valid = (flags[:,0] & self.cc.pfi.SOLUTION_OK) != 0
         if not np.all(valid):
@@ -1101,8 +1153,7 @@ class FpsCmd(object):
         # Here we start to deal with target table
         self.cc.trajectoryMode = True
         cmd.inform(f'text="Handling the cobra target table."')
-        traj, moves = eng.createTrajectory(self.cc.goodIdx, thetas, phis, tries=12, 
-            twoSteps=True, threshold=2.0, timeStep=500)
+        traj, moves = eng.createTrajectory(goodIdx, thetas, phis, tries=12, twoSteps=True, threshold=2.0, timeStep=500)
 
         cmd.inform(f'text="Reset the current angles for cobra arms."')
     
@@ -1124,7 +1175,7 @@ class FpsCmd(object):
         self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
         if twoSteps:
-            cIds=self.cc.goodIdx
+            cIds = goodIdx
 
             moves = np.zeros((1, len(cIds), 12), dtype=eng.moveDtype)
             
@@ -1154,7 +1205,7 @@ class FpsCmd(object):
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
                                 newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
-            dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(self.cc.goodIdx, thetas,
+            dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(cIds, thetas,
                                 phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
