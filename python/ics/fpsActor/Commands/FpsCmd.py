@@ -1086,9 +1086,8 @@ class FpsCmd(object):
             goodIdx = self.cc.goodIdx
             badIdx = self.cc.badIdx
         
-        #goodIdx = np.array(tuple(set(designHandle.goodIdx) ^ set(self.cc.badIdx)))
-        #badIdx = np.array(tuple(set(self.cc.badIdx).union(set(designHandle.badIdx))))
-        #badIdx = np.concatenate([designHandle.badIdx, self.cc.badIdx])
+        goodIdx = np.array(tuple(set(designHandle.targetMoveIdx) ^ set(self.cc.badIdx)))
+        badIdx = np.array(tuple(set(self.cc.badIdx).union(set(designHandle.targetNotMoveIdx))))
 
         self.logger.info(f"Mask file is {maskFile} badIdx = {badIdx}")
     
@@ -1127,25 +1126,20 @@ class FpsCmd(object):
         else:
             twoSteps = True
         
-        engDesign = 'engDesign' in cmdKeys
-
+        import pdb; pdb.set_trace()
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
         cmd.inform(f'text="Setting good cobra index"')
         goodIdx = self.cc.goodIdx
 
-        designHandle, goodIdx, badIdx = self.loadDesignHandle(designId, 
+        designHandle, targetGoodIdx, targetBadIdx = self.loadDesignHandle(designId, 
                                     maskFile, self.cc.calibModel,fillNaN=True)
         designTargets = designHandle.targets
 
         
-
         goodIdx = self.cc.goodIdx
         targets =  designHandle.targets[goodIdx]
-        #targetPos = pfsDesign.loadPfsDesign(designId)
-        #targets = targetPos[:,0]+targetPos[:,1]*1j
-        #targets = targets[goodIdx]
-        
+
         #import pdb; pdb.set_trace()
 
         cobras = self.cc.allCobras[goodIdx]
@@ -1158,6 +1152,8 @@ class FpsCmd(object):
         thetas = thetaSolution[:,0]
         phis = phiSolution[:,0]
         
+
+        cmd.finish(f'text="We are at design position. Do the work punk!"')
         # Here we start to deal with target table
         self.cc.trajectoryMode = True
         cmd.inform(f'text="Handling the cobra target table."')

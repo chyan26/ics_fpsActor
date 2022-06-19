@@ -4,19 +4,29 @@ import pathlib
 import pandas as pd
 from ics.fpsActor.utils import pfsDesign
 import numpy as np
+import logging
 
 class DesignFileHandle(object):
-    def __init__(self, designId, maskFile=None, calibModel = None):
+    def __init__(self, designId=None, maskFile=None, calibModel = None):
+        
+        # Initializing the logger
+        logging.basicConfig(format="%(asctime)s.%(msecs)03d %(levelno)s %(name)-10s %(message)s",
+                    datefmt="%Y-%m-%dT%H:%M:%S")
+        self.logger = logging.getLogger('DesignFileHandle')
+        self.logger.setLevel(logging.INFO)
 
         self.maskFile = maskFile
-        self.designId = designId
         self.targets = None
+
         self.goodIdx = None
         self.badIdx = None
         self.calibModel = calibModel
-        
-        if self.designId is not None:
+           
+
+        if designId is not None:
+            self.designId = designId
             self._loadTargets()
+        
 
         if self.calibModel is not None:
             self.centers = self.calibModel.centers
@@ -52,12 +62,9 @@ class DesignFileHandle(object):
         cobra_x = np.array(cobra_x)
         cobra_y = np.array(cobra_y)
         
-        goodIdx = np.array(goodIdx)
-        badIdx = np.array(badIdx)
+        self.targetMoveIdx  = np.array(goodIdx)
+        self.targetNotMoveIdx = np.array(badIdx)
 
-
-        self.goodIdx = goodIdx
-        self.badIdx = badIdx
         targets = cobra_x+cobra_y*1j
         
         self.targets = targets
@@ -67,7 +74,7 @@ class DesignFileHandle(object):
         targets = self.targets
         for idx, t in enumerate(targets):
             if np.isnan(t.real):
-                targets[idx] = self.centers[idx]
+                targets[idx] = self.centers[idx]+(0.5+0.5j)
         self.targets = targets
 
     def loadMask(self):
@@ -77,5 +84,28 @@ class DesignFileHandle(object):
             notMoveCobra = cobraInfo.loc[cobraInfo['bitMask'] == 0]
             doMoveCobra = cobraInfo.loc[cobraInfo['bitMask'] == 1]
 
-            self.badIdx = notMoveCobra['cobraId'].values - 1
-            self.goodIdx = doMoveCobra['cobraId'].values - 1
+            self.targetMoveIdx = doMoveCobra['cobraId'].values - 1
+            self.targetNotMoveIdx = notMoveCobra['cobraId'].values - 1
+
+            #self.goodIdx = self.targetMoveIdx
+            #self.badIdx = self.targetMoveIdx
+
+    def loadCalibCobra(self, calibModel):
+        
+        
+        des = calibModel
+        cobras = []
+        for i in des.findAllCobras():
+            c = func.Cobra(des.moduleIds[i],
+                        des.positionerIds[i])
+            cobras.append(c)
+        allCobras = np.array(cobras)
+        nCobras = len(allCobras)
+
+        goodNums = [i+1 for i,c in enumerate(allCobras) if
+                des.cobraIsGood(c.cobraNum, c.module)]
+        badNums = [e for e in range(1, nCobras+1) if e not in goodNums]
+
+
+        self.goodIdx = np.array(goodNums, dtype='i4') - 1
+        self.badIdx = np.array(badNums, dtype='i4') - 1
