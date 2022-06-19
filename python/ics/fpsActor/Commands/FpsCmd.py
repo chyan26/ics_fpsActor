@@ -85,7 +85,7 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@engDesign] [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>] [<maskFile>]', 
+            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>] [<maskFile>]', 
                 self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -739,6 +739,9 @@ class FpsCmd(object):
 
             self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
 
+        
+        #self.logger.info(f'The current phi angle = {eng.}')
+
         cmd.finish(f'text="Moved all arms back to home"')
 
     def cobraAndDotRecenter(self, cmd):
@@ -1064,21 +1067,29 @@ class FpsCmd(object):
 
     def loadDesignHandle(self, designId, maskFile, calibModel, fillNaN=False):
         """Load designHandle and maskFile."""
-        designHandle = designFileHandle.DesignFileHandle(designId, 
-            maskFile=maskFile, calibModel=calibModel)
 
+        designHandle = designFileHandle.DesignFileHandle(designId = designId, 
+            maskFile=maskFile, calibModel=calibModel)
+    
         if fillNaN is True:
             designHandle.fillCalibModelCenter()
 
+        #goodIdx = designHandle.goodIdx
+        #badIdx = designHandle.badIdx
+        
         # Loading mask file when it is given.
         if maskFile is not None:
             designHandle.loadMask()
-            goodIdx = designHandle.goodIdx
-            badIdx = designHandle.badIdx
+            goodIdx = designHandle.targetMoveIdx
+            badIdx = designHandle.targetNotMoveIdx
         else:
             goodIdx = self.cc.goodIdx
             badIdx = self.cc.badIdx
         
+        #goodIdx = np.array(tuple(set(designHandle.goodIdx) ^ set(self.cc.badIdx)))
+        #badIdx = np.array(tuple(set(self.cc.badIdx).union(set(designHandle.badIdx))))
+        #badIdx = np.concatenate([designHandle.badIdx, self.cc.badIdx])
+
         self.logger.info(f"Mask file is {maskFile} badIdx = {badIdx}")
     
         return designHandle, goodIdx, badIdx
@@ -1120,24 +1131,20 @@ class FpsCmd(object):
 
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
-         cmd.inform(f'text="Setting good cobra index"')
+        cmd.inform(f'text="Setting good cobra index"')
         goodIdx = self.cc.goodIdx
 
-
-        if engDesign is True:
-            targetPos = pfsDesign.loadPfsDesign(designId)
-            targets = targetPos[:,0]+targetPos[:,1]*1j
-            targets = targets[goodIdx]
-        else:
-
-            designHandle, goodIdx, badIdx = self.loadDesignHandle(designId, 
-                                        maskFile, self.cc.calibModel,fillNaN=True)
-            targets = designHandle.targets[goodIdx]
+        designHandle, goodIdx, badIdx = self.loadDesignHandle(designId, 
+                                    maskFile, self.cc.calibModel,fillNaN=True)
+        designTargets = designHandle.targets
 
         
-        targetPos = pfsDesign.loadPfsDesign(designId)
-        targets = targetPos[:,0]+targetPos[:,1]*1j
-        targets = targets[goodIdx]
+
+        goodIdx = self.cc.goodIdx
+        targets =  designHandle.targets[goodIdx]
+        #targetPos = pfsDesign.loadPfsDesign(designId)
+        #targets = targetPos[:,0]+targetPos[:,1]*1j
+        #targets = targets[goodIdx]
         
         #import pdb; pdb.set_trace()
 
@@ -1145,8 +1152,9 @@ class FpsCmd(object):
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
         valid = (flags[:,0] & self.cc.pfi.SOLUTION_OK) != 0
         if not np.all(valid):
-            raise RuntimeError(f"Given positions are invalid: {np.where(valid)[0]}")
-
+            #raise RuntimeError(f"Given positions are invalid: {np.where(valid)[0]}")
+            cmd.inform(f'text="Given positions are invalid: {np.where(valid)[0]}"')
+        
         thetas = thetaSolution[:,0]
         phis = phiSolution[:,0]
         
