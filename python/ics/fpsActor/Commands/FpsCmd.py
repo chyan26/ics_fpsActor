@@ -85,7 +85,7 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<iteration>] [<tolerance>] [<maskFile>]', 
+            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]', 
                 self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -511,11 +511,12 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
         visit = self.actor.visitor.setOrGetVisit(cmd)
         cnt = cmdKeys["cnt"].values[0] \
-              if 'cnt' in cmdKeys \
-                 else 1
+            if 'cnt' in cmdKeys \
+                else 1
+
         expTime = cmdKeys["expTime"].values[0] \
-                  if "expTime" in cmdKeys \
-                     else None
+            if "expTime" in cmdKeys \
+                else None
 
         for i in range(cnt):
             frameSeq = self.actor.visitor.frameSeq
@@ -1099,6 +1100,11 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
         designId = cmdKeys['designId'].values[0]
 
+
+        expTime = cmdKeys["expTime"].values[0] \
+            if "expTime" in cmdKeys \
+                else None
+        cmd.inform(f'text="Setting moveToPfsDesign expTime={expTime}"')
 
         # Adding aruments for iteration and tolerance
         if 'maskFile' in cmdKeys:
