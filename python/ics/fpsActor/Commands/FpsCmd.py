@@ -1086,8 +1086,8 @@ class FpsCmd(object):
             goodIdx = self.cc.goodIdx
             badIdx = self.cc.badIdx
         
-        goodIdx = np.array(tuple(set(designHandle.targetMoveIdx) ^ set(self.cc.badIdx)))
-        badIdx = np.array(tuple(set(self.cc.badIdx).union(set(designHandle.targetNotMoveIdx))))
+        #goodIdx = np.array(tuple(set(designHandle.targetMoveIdx) ^ set(self.cc.badIdx)))
+        #badIdx = np.array(tuple(set(self.cc.badIdx).union(set(designHandle.targetNotMoveIdx))))
 
         self.logger.info(f"Mask file is {maskFile} badIdx = {badIdx}")
     
@@ -1126,7 +1126,7 @@ class FpsCmd(object):
         else:
             twoSteps = True
         
-        import pdb; pdb.set_trace()
+        # import pdb; pdb.set_trace()
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
 
         cmd.inform(f'text="Setting good cobra index"')
@@ -1135,8 +1135,7 @@ class FpsCmd(object):
         designHandle, targetGoodIdx, targetBadIdx = self.loadDesignHandle(designId, 
                                     maskFile, self.cc.calibModel,fillNaN=True)
         designTargets = designHandle.targets
-
-        
+ 
         goodIdx = self.cc.goodIdx
         targets =  designHandle.targets[goodIdx]
 
@@ -1152,12 +1151,10 @@ class FpsCmd(object):
         thetas = thetaSolution[:,0]
         phis = phiSolution[:,0]
         
-
-        cmd.finish(f'text="We are at design position. Do the work punk!"')
         # Here we start to deal with target table
         self.cc.trajectoryMode = True
         cmd.inform(f'text="Handling the cobra target table."')
-        traj, moves = eng.createTrajectory(goodIdx, thetas, phis, tries=12, twoSteps=True, threshold=2.0, timeStep=500)
+        traj, moves = eng.createTrajectory(goodIdx, thetas, phis, tries=iteration, twoSteps=True, threshold=2.0, timeStep=500)
 
         cmd.inform(f'text="Reset the current angles for cobra arms."')
     
@@ -1168,7 +1165,7 @@ class FpsCmd(object):
 
         targetTable = traj.calculateFiberPositions(self.cc)
 
-        cobraTargetTable = najaVenator.cobraTargetTable(visit, 12, self.cc.calibModel)
+        cobraTargetTable = najaVenator.cobraTargetTable(visit, iteration, self.cc.calibModel)
         cobraTargetTable.makeTargetTable(moves,self.cc)
         cobraTargetTable.writeTargetTable()
         
@@ -1181,7 +1178,7 @@ class FpsCmd(object):
         if twoSteps:
             cIds = goodIdx
 
-            moves = np.zeros((1, len(cIds), 12), dtype=eng.moveDtype)
+            moves = np.zeros((1, len(cIds), iteration), dtype=eng.moveDtype)
             
             thetaRange = ((self.cc.calibModel.tht1 - self.cc.calibModel.tht0 + np.pi) % (np.pi*2) + np.pi)[cIds]
             phiRange = ((self.cc.calibModel.phiOut - self.cc.calibModel.phiIn) % (np.pi*2))[cIds]
