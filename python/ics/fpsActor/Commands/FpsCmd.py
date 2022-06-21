@@ -1104,6 +1104,8 @@ class FpsCmd(object):
         expTime = cmdKeys["expTime"].values[0] \
             if "expTime" in cmdKeys \
                 else None
+
+        self.cc.expTime = expTime
         cmd.inform(f'text="Setting moveToPfsDesign expTime={expTime}"')
 
         # Adding aruments for iteration and tolerance
