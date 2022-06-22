@@ -1206,6 +1206,7 @@ class FpsCmd(object):
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
                                 newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
+            cIds = goodIdx
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(cIds, thetas,
                                 phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
