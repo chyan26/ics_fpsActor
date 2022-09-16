@@ -38,6 +38,7 @@ from ics.fpsActor import fpsFunction as fpstool
 from ics.fpsActor.utils import display as vis
 from ics.fpsActor.utils import designHandle as designFileHandle
 from ics.fpsActor.utils import pfsDesign
+import ics.fpsActor.utils.pfsConfig as pfsConfigUtils
 
 reload(vis)
 
@@ -48,7 +49,7 @@ reload(najaVenator)
 reload(eng)
 reload(designFileHandle)
 reload(pfsDesign)
-
+reload(pfsConfigUtils)
 
 
 class FpsCmd(object):
@@ -1221,6 +1222,11 @@ class FpsCmd(object):
 
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
+
+        # write pfsConfig
+        pfsConfig = pfsConfigUtils.writePfsConfig(pfsDesignId=designId, visitId=visit)
+
+
         #np.save(dataPath / 'badMoves', badMoves)
 
         cmd.finish(f'text="We are at design position. Do the work punk!"')
