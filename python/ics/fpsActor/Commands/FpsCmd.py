@@ -39,6 +39,7 @@ from ics.fpsActor.utils import display as vis
 from ics.fpsActor.utils import designHandle as designFileHandle
 from ics.fpsActor.utils import pfsDesign
 import ics.fpsActor.utils.pfsConfig as pfsConfigUtils
+import pfs.utils.ingestPfsDesign as ingestPfsDesign
 
 reload(vis)
 
@@ -50,7 +51,7 @@ reload(eng)
 reload(designFileHandle)
 reload(pfsDesign)
 reload(pfsConfigUtils)
-
+reload(ingestPfsDesign)
 
 class FpsCmd(object):
     def __init__(self, actor):
@@ -1226,6 +1227,12 @@ class FpsCmd(object):
         # write pfsConfig
         pfsConfig = pfsConfigUtils.writePfsConfig(pfsDesignId=designId, visitId=visit)
 
+        # insert into opdb
+        try:
+            ingestPfsDesign.ingestPfsConfig(pfsConfig, allocated_at='now')
+            cmd.inform(f'text="{pfsConfig.filename} successfully inserted in opdb !"')
+        except Exception as e:
+            cmd.warn(f'text="ingestPfsConfig failed with {str(e)}, ignoring for now..."')
 
         #np.save(dataPath / 'badMoves', badMoves)
 
