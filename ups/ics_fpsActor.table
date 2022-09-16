@@ -3,6 +3,7 @@ setupRequired(tron_actorcore)
 setupRequired(ics_cobraCharmer)
 setupRequired(ics_mcsActor)
 setupRequired(spt_operational_database)
+setupRequired(datamodel)
 
 pathPrepend(PATH, ${PRODUCT_DIR}/bin)
 pathPrepend(PYTHONPATH, ${PRODUCT_DIR}/python)
