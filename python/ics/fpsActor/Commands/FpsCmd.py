@@ -84,7 +84,7 @@ class FpsCmd(object):
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
-            ('moveToHome', '@(phi|theta|all) [<visit>]', self.moveToHome),
+            ('moveToHome', '@(phi|theta|all) [<expTime>] [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]', 
@@ -723,6 +723,13 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
 
         self.actor.visitor.setOrGetVisit(cmd)
+
+        expTime = cmdKeys["expTime"].values[0] \
+            if "expTime" in cmdKeys \
+                else None
+
+        self.cc.expTime = expTime
+        cmd.inform(f'text="Setting moveToHome expTime={expTime}"')
 
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
