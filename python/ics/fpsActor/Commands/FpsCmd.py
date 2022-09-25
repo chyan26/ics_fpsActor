@@ -1152,6 +1152,7 @@ class FpsCmd(object):
         self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
         if twoSteps:
+            cmdKeys['convergence'] = 'in progress'
             cIds = goodIdx
 
             moves = np.zeros((1, len(cIds), iteration), dtype=eng.moveDtype)
