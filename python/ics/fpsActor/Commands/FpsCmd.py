@@ -133,6 +133,7 @@ class FpsCmd(object):
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
                                         keys.Key("phi", types.Float(), help="Distance to move phi"),
                                         keys.Key("board", types.Int(), help="board index 1-84"),
+                                        keys.Key("convergence", types.String(), help="Convergence status"),
                                         keys.Key("stepsPerMove", types.Int(), default=-50,
                                                  help="number of steps per move")
                                         )
