@@ -519,6 +519,9 @@ class FpsCmd(object):
         expTime = cmdKeys["expTime"].values[0] \
             if "expTime" in cmdKeys \
                 else None
+        
+        if expTime is not None:
+            self.cc.expTime = expTime
 
         for i in range(cnt):
             frameSeq = self.actor.visitor.frameSeq
