@@ -40,6 +40,8 @@ from ics.fpsActor.utils import designHandle as designFileHandle
 from ics.fpsActor.utils import pfsDesign
 import ics.fpsActor.utils.pfsConfig as pfsConfigUtils
 import pfs.utils.ingestPfsDesign as ingestPfsDesign
+from pfs.utils import butler
+
 
 reload(vis)
 
@@ -79,7 +81,7 @@ class FpsCmd(object):
             ('fpgaSim', '@(on|off) [<datapath>]', self.fpgaSim),
             ('ledlight', '@(on|off)', self.ledlight),
             ('loadDesign', '<id>', self.loadDesign),
-            ('loadModel', '<xml>', self.loadModel),
+            ('loadModel', '[<xml>]', self.loadModel),
             ('cobraAndDotRecenter', '', self.cobraAndDotRecenter),
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
@@ -160,6 +162,9 @@ class FpsCmd(object):
         if self.cc is not None:
             eng.setCobraCoach(self.cc)
 
+        
+
+
     # .cc and .db live in the actor, so that we can reload safely.
     @property
     def cc(self):
@@ -234,8 +239,15 @@ class FpsCmd(object):
         cmd.finish(f"text='fpgaSim command finished.'")
 
     def loadModel(self, cmd):
-        """ Loading cobr"""
-        xml = cmd.cmd.keywords['xml'].values[0]
+        """ Loading cobra Model"""
+        cmdKeys = cmd.cmd.keywords
+        xml = cmdKeys['xml'].values[0] if 'xml' in cmdKeys else None
+        
+        butlerResource = butler.Butler()
+        
+        if xml is None:
+            xml = butlerResource.getPath("moduleXml", moduleName="ALL", version="")
+
         self.logger.info(f'Input XML file = {xml}')
         self.xml = pathlib.Path(xml)
 

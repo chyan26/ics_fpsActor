@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import actorcore.ICC
-
+from twisted.internet import reactor
 
 class Visitor(object):
     def __init__(self, actor):
@@ -73,7 +73,7 @@ class Fps(actorcore.ICC.ICC):
 
             self.visitor = Visitor(self)
 
-            # reactor.callLater(10, self.status_check)
+            reactor.callLater(2, self.callCommand, 'loadModel')
 
     def getPositionsForFrame(self, frameId):
         return self.cmdSets['FpsCmd'].getPositionsForFrame(frameId)
