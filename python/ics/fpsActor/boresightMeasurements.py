@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy import optimize
 from datetime import datetime, timezone
+from scipy.spatial import cKDTree
 
 
 def nearestNeighbourMatchingBore(points, targets, unrot):
