@@ -124,7 +124,7 @@ def initialBoresight(db, frameIDs):
     #for each frame, pull the spots from database, and calculate mean position
     for frameId in frameIDs:
         # retrieve all spots
-        points = dbTools.loadCentroidsFromDB(db, frameId)
+        points = loadCentroidsFromDB(db, frameId)
 
         # get means
         xC.append(np.nanmean(points[:, 1]))
