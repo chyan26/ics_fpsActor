@@ -243,9 +243,10 @@ class FpsCmd(object):
         cmdKeys = cmd.cmd.keywords
         xml = cmdKeys['xml'].values[0] if 'xml' in cmdKeys else None
         
+        butlerResource = butler.Butler()
+        
         if xml is None:
-            butler = butler.Butler()
-            xml = butler.getPath("moduleXml", moduleName="ALL", version="")
+            xml = butlerResource.getPath("moduleXml", moduleName="ALL", version="")
 
         self.logger.info(f'Input XML file = {xml}')
         self.xml = pathlib.Path(xml)
