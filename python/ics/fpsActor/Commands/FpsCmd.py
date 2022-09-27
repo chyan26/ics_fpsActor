@@ -20,7 +20,7 @@ import pandas as pd
 import cv2
 from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
-import mcsActor.mcsRoutines.mcsRoutines as mcsTools
+import ics.fpsActor.boresightMeasurements as fpsTools
 
 from copy import deepcopy
 
@@ -1339,5 +1339,5 @@ class FpsCmd(object):
 
         # the routine will calculate the value and write to db
         db = self.connectToDB(cmd)
-        mcsTools.calcBoresight(db, frameIds, pfsVisitId)
+        fpsTools.calcBoresight(db, frameIds, pfsVisitId)
 
