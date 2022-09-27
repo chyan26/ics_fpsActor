@@ -3,6 +3,7 @@ import pandas as pd
 from scipy import optimize
 from datetime import datetime, timezone
 from scipy.spatial import cKDTree
+import cv2
 
 
 def nearestNeighbourMatchingBore(points, targets, unrot):
@@ -250,3 +251,58 @@ def writeBoresightToDB(db, pfsVisitId, boresight):
     df = pd.DataFrame({'pfs_visit_id': [pfsVisitId], 'mcs_boresight_x_pix': [boresight[0]], 'mcs_boresight_y_pix': [boresight[1]],
                        'calculated_at': [dt]})
     db.bulkInsert('mcs_boresight', df)
+
+
+def calcAffineTransform(pos1, pos2):
+    """
+
+    given two sets of registered points, estimate the rigid transformation
+    this is a wrapper for the cv2 routine
+    Returns transformation matrix and extracted parameters (rotation, translation, scale)
+
+    input:
+    pos1 input positions in nx3 shape, first column is an id number, next two coordinates
+    xx, yy: transformed positions
+    getVales: if == 1, return parameters too
+
+    output: 
+    transformation: matrix 
+    xd, yd: translations
+    sx, sy: scalings
+    rotation: rotation (radians)
+
+    """
+
+    sz = pos1.shape[0]
+    # turn data into right form
+    pts1 = np.zeros((1, sz, 2))
+    pts2 = np.zeros((1, sz, 2))
+
+    pts1[0, :, 0] = pos1[:, 1]
+    pts1[0, :, 1] = pos1[:, 2]
+
+    pts2[0, :, 0] = pos2[:, 1]
+    pts2[0, :, 1] = pos2[:, 2]
+
+    #float32 is needed
+    pts1 = np.float32(pts1)
+    pts2 = np.float32(pts2)
+
+    # calculate the transformation
+    #transformation = cv2.estimateRigidTransform(pts1, pts2, False)
+
+    afCoeff, inlier = cv2.estimateAffinePartial2D(pts1, pts2)
+
+    # extract the parameters
+
+    sx = np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2)
+    sy = np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2)
+
+    xd = afCoeff[0, 2]
+    yd = afCoeff[1, 2]
+
+    rotation = np.arctan2(afCoeff[1, 0]/np.sqrt(afCoeff[0, 0]**2+afCoeff[0, 1]**2), 
+                          afCoeff[1, 1]/np.sqrt(afCoeff[1, 0]**2+afCoeff[1, 1]**2))
+
+    return afCoeff, xd, yd, sx, sy, rotation
+
