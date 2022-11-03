@@ -5,7 +5,7 @@ from scipy.stats import sigmaclip
 import numpy.ma as ma
 from scipy import optimize
 import math
-#import cv2
+import cv2
 import pandas as pd
 from ics.cobraCharmer.utils import butler
 import cmath
