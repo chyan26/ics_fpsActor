@@ -17,7 +17,7 @@ from astropy.io import fits
 
 import numpy as np
 import pandas as pd
-import cv2
+#import cv2
 from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
 import ics.fpsActor.boresightMeasurements as fpsTools
@@ -89,7 +89,7 @@ class FpsCmd(object):
             ('moveToHome', '@(phi|theta|all) [<expTime>] [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
-            ('moveToPfsDesign', '<designId> [@twoStepsOff] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]', 
+            ('moveToPfsDesign', '<designId> [@twoStepsOff] [@goHome] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]', 
                 self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]', self.makeMotorMap),
@@ -1158,8 +1158,16 @@ class FpsCmd(object):
         else:
             twoSteps = True
         
+        
         # import pdb; pdb.set_trace()
         cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
+
+        if 'goHome' in cmdKeys:
+            goHome = True
+        else:
+            goHome = False
+        cmd.inform(f'text="move to home ={goHome}"')
+
 
         cmd.inform(f'text="Setting good cobra index"')
         goodIdx = self.cc.goodIdx
@@ -1171,7 +1179,7 @@ class FpsCmd(object):
         goodIdx = self.cc.goodIdx
         targets =  designHandle.targets[goodIdx]
 
-        #import pdb; pdb.set_trace()
+        import pdb; pdb.set_trace()
 
         cobras = self.cc.allCobras[goodIdx]
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
@@ -1229,14 +1237,14 @@ class FpsCmd(object):
             _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
             dataPath, atThetas, atPhis, moves[0,:,:2] = \
-                eng.moveThetaPhi(cIds, thetasVia, phisVia, False, True, tolerance=tolerance, 
+                eng.moveThetaPhi(cIds, thetasVia, phisVia, relative=False, local=True, tolerance=tolerance, 
                             tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
                             threshold=2.0,thetaMargin=np.deg2rad(15.0))
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:] = \
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
-                                newDir=True, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
+                                newDir=False, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
             cIds = goodIdx
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(cIds, thetas,
