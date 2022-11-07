@@ -250,8 +250,8 @@ def writeBoresightToDB(db, pfsVisitId, boresight):
    
     df = pd.DataFrame({'pfs_visit_id': [pfsVisitId], 'mcs_boresight_x_pix': [boresight[0]], 'mcs_boresight_y_pix': [boresight[1]],
                        'calculated_at': [dt]})
-    db.bulkInsert('mcs_boresight', df)
 
+    db.insert('mcs_boresight', df)
 
 def calcAffineTransform(pos1, pos2):
     """
