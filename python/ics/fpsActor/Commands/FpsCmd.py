@@ -1150,6 +1150,7 @@ class FpsCmd(object):
 
         cmd.inform(f'text="Running moveToPfsDeign with tolerance={tolerance} iteration={iteration}"')
 
+        #import pdb; pdb.set_trace()
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
         twoStepsOff = 'twoStepsOff' in cmdKeys
@@ -1166,7 +1167,7 @@ class FpsCmd(object):
             goHome = True
         else:
             goHome = False
-        cmd.inform(f'text="move to home ={goHome}"')
+        cmd.inform(f'text="users asked to move back home ={goHome}"')
 
 
         cmd.inform(f'text="Setting good cobra index"')
@@ -1179,7 +1180,7 @@ class FpsCmd(object):
         goodIdx = self.cc.goodIdx
         targets =  designHandle.targets[goodIdx]
 
-        import pdb; pdb.set_trace()
+        
 
         cobras = self.cc.allCobras[goodIdx]
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
@@ -1238,12 +1239,12 @@ class FpsCmd(object):
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
             dataPath, atThetas, atPhis, moves[0,:,:2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, relative=False, local=True, tolerance=tolerance, 
-                            tries=2, homed=False,newDir=True, thetaFast=True, phiFast=True, 
+                            tries=2, homed=goHome,newDir=True, thetaFast=True, phiFast=True, 
                             threshold=2.0,thetaMargin=np.deg2rad(15.0))
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:] = \
-                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
+                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=goHome,
                                 newDir=False, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
             cIds = goodIdx
