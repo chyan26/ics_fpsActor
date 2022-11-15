@@ -1219,9 +1219,9 @@ class FpsCmd(object):
         # adjust theta angles that is too closed to the CCW hard stops
         thetaMarginCCW=0.1
         thetas[thetas < thetaMarginCCW] += np.pi*2
-        if goHome is True:
-            cmd.inform(f'text="Reset the motor scaling factor."')
-            self.cc.pfi.resetMotorScaling(self.cc.allCobras)
+        
+        cmd.inform(f'text="Reset the motor scaling factor."')
+        self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
         if twoSteps:
             cIds = goodIdx
@@ -1256,7 +1256,7 @@ class FpsCmd(object):
         else:
             cIds = goodIdx
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(cIds, thetas,
-                                phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
+                                phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=goHome,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
 
