@@ -1244,7 +1244,7 @@ class FpsCmd(object):
 
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0,:,2:] = \
-                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=goHome,
+                eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance, tries=iteration-2, homed=False,
                                 newDir=False, thetaFast=False, phiFast=True, threshold=2.0, thetaMargin=np.deg2rad(15.0))
         else:
             cIds = goodIdx
