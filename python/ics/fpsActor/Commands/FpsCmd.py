@@ -1207,7 +1207,7 @@ class FpsCmd(object):
             self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=thetaHome, phiAngles=0)
         else:
             cmd.inform(f'text="Setting ThetaAngle = {self.atThetas} and phiAngle = {self.atPhis}."')
-            self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=self.atThetas, phiAngles=self.atPhis)
+            self.cc.setCurrentAngles(self.cc.allCobras[goodIdx], thetaAngles=self.atThetas, phiAngles=self.atPhis)
 
         targetTable = traj.calculateFiberPositions(self.cc)
 
