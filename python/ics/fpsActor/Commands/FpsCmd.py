@@ -1202,7 +1202,12 @@ class FpsCmd(object):
         self.cc.trajectoryMode = False
         thetaHome = ((self.cc.calibModel.tht1 - self.cc.calibModel.tht0 + np.pi)
                               % (np.pi*2) + np.pi)
-        self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=thetaHome, phiAngles=0)
+        if goHome is True:
+            cmd.inform(f'text="Setting ThetaAngle = Home and phiAngle = 0."')
+            self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=thetaHome, phiAngles=0)
+        else:
+            cmd.inform(f'text="Setting ThetaAngle = {self.cc.cobraInfo.thetaAngle} and phiAngle = {self.cc.cobraInfo.phiAngle}."')
+            self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=self.cc.cobraInfo.thetaAngle, phiAngles=self.cc.cobraInfo.phiAngle)
 
         targetTable = traj.calculateFiberPositions(self.cc)
 
@@ -1214,7 +1219,9 @@ class FpsCmd(object):
         # adjust theta angles that is too closed to the CCW hard stops
         thetaMarginCCW=0.1
         thetas[thetas < thetaMarginCCW] += np.pi*2
-        self.cc.pfi.resetMotorScaling(self.cc.allCobras)
+        if goHome is True:
+            cmd.inform(f'text="Reset the motor scaling factor."')
+            self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
         if twoSteps:
             cIds = goodIdx
