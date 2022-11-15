@@ -17,7 +17,7 @@ from astropy.io import fits
 
 import numpy as np
 import pandas as pd
-#import cv2
+import cv2
 from pfs.utils.coordinates import CoordTransp
 from pfs.utils.coordinates import DistortionCoefficients
 import ics.fpsActor.boresightMeasurements as fpsTools
@@ -1206,8 +1206,8 @@ class FpsCmd(object):
             cmd.inform(f'text="Setting ThetaAngle = Home and phiAngle = 0."')
             self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=thetaHome, phiAngles=0)
         else:
-            cmd.inform(f'text="Setting ThetaAngle = {self.cc.cobraInfo.thetaAngle} and phiAngle = {self.cc.cobraInfo.phiAngle}."')
-            self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=self.cc.cobraInfo.thetaAngle, phiAngles=self.cc.cobraInfo.phiAngle)
+            cmd.inform(f'text="Setting ThetaAngle = {self.atThetas} and phiAngle = {self.atPhis}."')
+            self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=self.atThetas, phiAngles=self.atPhis)
 
         targetTable = traj.calculateFiberPositions(self.cc)
 
@@ -1259,6 +1259,10 @@ class FpsCmd(object):
                                 phis, relative=False, local=True, tolerance=tolerance, tries=iteration, homed=False,
                                 newDir=True, thetaFast=False, phiFast=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
+
+        self.atThetas = atThetas
+        self.atPhis = atPhis
+        
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
 
