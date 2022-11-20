@@ -86,7 +86,7 @@ class FpsCmd(object):
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
-            ('moveToHome', '@(phi|theta|all) [<expTime>] [<visit>]', self.moveToHome),
+            ('moveToHome', '@(phi|theta|all) [<expTime>] [@noMCSexposure] [<visit>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [@goHome] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]', 
@@ -749,7 +749,8 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         allfiber = 'all' in cmdKeys
-
+        noMCSexposure = 'noMCSexposure' in cmdKeys
+ 
         if phi is True:
             eng.setPhiMode()
             self.cc.moveToHome(self.cc.goodCobras, phiEnable=True)
@@ -760,9 +761,12 @@ class FpsCmd(object):
 
         if allfiber is True:
             eng.setNormalMode()
-            diff = self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
-
-            self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
+            if noMCSexposure:
+                self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, 
+                thetaCCW=False, noMCS=True)
+            else:
+                diff = self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
+                self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
 
         
         #self.logger.info(f'The current phi angle = {eng.}')
