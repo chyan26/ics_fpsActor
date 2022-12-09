@@ -752,6 +752,7 @@ class FpsCmd(object):
         noMCSexposure = 'noMCSexposure' in cmdKeys
     
         if 'maskFile' in cmdKeys:
+            cmd.inform(f'text="maskFile = {maskFile}. Activating subset movement of cobra."')    
             maskFile = cmdKeys['maskFile'].values[0]
 
             designHandle = designFileHandle.DesignFileHandle(designId = None, 
