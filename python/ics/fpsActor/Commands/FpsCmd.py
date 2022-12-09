@@ -86,7 +86,7 @@ class FpsCmd(object):
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
-            ('moveToHome', '@(phi|theta|all) [<expTime>] [<visit>]', self.moveToHome),
+            ('moveToHome', '@(phi|theta|all) [<expTime>] [@noMCSexposure] [<visit>] [<maskFile>]', self.moveToHome),
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign', '<designId> [@twoStepsOff] [@goHome] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]', 
@@ -749,6 +749,30 @@ class FpsCmd(object):
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         allfiber = 'all' in cmdKeys
+        noMCSexposure = 'noMCSexposure' in cmdKeys
+    
+        if 'maskFile' in cmdKeys:
+            cmd.inform(f'text="maskFile = {maskFile}. Activating subset movement of cobra."')    
+            maskFile = cmdKeys['maskFile'].values[0]
+
+            designHandle = designFileHandle.DesignFileHandle(designId = None, 
+            maskFile=maskFile, calibModel=self.cc.calibModel)
+
+            designHandle.loadMask()
+            goodIdx = designHandle.targetMoveIdx
+            badIdx = designHandle.targetNotMoveIdx
+            goodCobra = self.cc.allCobras[goodIdx]
+            
+        else:
+            maskFile = None
+            goodCobra = self.cc.allCobras[self.cc.goodIdx]
+        
+        # Loading mask file when it is given.
+        if maskFile is not None:
+            designHandle.loadMask()
+            goodIdx = designHandle.targetMoveIdx
+            badIdx = designHandle.targetNotMoveIdx
+
 
         if phi is True:
             eng.setPhiMode()
@@ -760,9 +784,13 @@ class FpsCmd(object):
 
         if allfiber is True:
             eng.setNormalMode()
-            diff = self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True, phiEnable=True, thetaCCW=False)
-
-            self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
+            if noMCSexposure:
+                cmd.inform(f'text="noMCSExposure is {noMCSexposure}, skipping MCS operation."')    
+                self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, 
+                    thetaCCW=False, noMCS=True)
+            else:
+                diff = self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, thetaCCW=False)
+                self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
 
         
         #self.logger.info(f'The current phi angle = {eng.}')
