@@ -1,11 +1,11 @@
 import numpy as np
 import pandas as pd
+import pfs.utils.pfsConfigUtils as pfsConfigUtils
 from opdb import opdb
 from pfs.datamodel import PfsDesign, PfsConfig
 from pfs.utils.fiberids import FiberIds
 
 pfsDesignDir = '/data/pfsDesign'
-pfsConfigDir = '/data/drp/pfsDesign'
 
 
 def fetchFinalConvergence(visitId):
@@ -26,19 +26,6 @@ def fetchFinalConvergence(visitId):
     return lastIteration
 
 
-def cobraIdToFiberId(cobraIds):
-    """Return fiberIds for the specified cobraIds.
-
-    Parameters
-    ----------
-    cobraIds : `numpy.ndarray` of `int`
-        Array of 1-indexed cobraIds.
-    """
-    gfm = pd.DataFrame(FiberIds().data)
-    fiberIds = gfm.set_index('cobraId').loc[cobraIds].fiberId.to_numpy()
-    return fiberIds
-
-
 def writePfsConfig(pfsDesignId, visitId):
     """Write pfsConfig with final cobra positions after converging to pfsDesign.
 
@@ -56,14 +43,14 @@ def writePfsConfig(pfsDesignId, visitId):
     pfiCenter = np.empty(pfsDesign.pfiNominal.shape, dtype=pfsDesign.pfiNominal.dtype)
     pfiCenter[:] = np.NaN
     # Construct the index.
-    fiberId = cobraIdToFiberId(lastIteration.cobra_id.to_numpy())
+    fiberId = FiberIds().cobraIdToFiberId(lastIteration.cobra_id.to_numpy())
     fiberIndex = pd.DataFrame(dict(fiberId=pfsDesign.fiberId, tindex=np.arange(len(pfsDesign.fiberId))))
     fiberIndex = fiberIndex.set_index('fiberId').loc[fiberId].tindex.to_numpy()
     # Set final cobra position.
     pfiCenter[fiberIndex, 0] = lastIteration.pfi_center_x_mm.to_numpy()
     pfiCenter[fiberIndex, 1] = lastIteration.pfi_center_y_mm.to_numpy()
-    # instantiate and write pfsConfig to disk.
-    pfsConfig = PfsConfig.fromPfsDesign(pfsDesign=pfsDesign, visit0=visitId, pfiCenter=pfiCenter)
-    pfsConfig.write(dirName=pfsConfigDir)
-
+    # Instantiate pfsConfig from pfsDesign.
+    pfsConfig = PfsConfig.fromPfsDesign(pfsDesign=pfsDesign, visit=visitId, pfiCenter=pfiCenter)
+    # Write pfsConfig to disk.
+    pfsConfigUtils.writePfsConfig(pfsConfig)
     return pfsConfig
