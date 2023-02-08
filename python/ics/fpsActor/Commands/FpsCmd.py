@@ -15,14 +15,11 @@ import numpy as np
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
 import pandas as pd
-import pfs.utils.ingestPfsDesign as ingestPfsDesign
 from ics.cobraCharmer import pfi as pfiControl
 from ics.fpsActor import fpsFunction as fpstool
 from ics.fpsActor import fpsState
 from ics.fpsActor import najaVenator
-from ics.fpsActor.utils import designHandle as designFileHandle
 from ics.fpsActor.utils import display as vis
-from ics.fpsActor.utils import pfsDesign
 from opdb import opdb
 from pfs.utils import butler
 from procedures.moduleTest import calculation
@@ -36,10 +33,8 @@ reload(pfiControl)
 reload(cobraCoach)
 reload(najaVenator)
 reload(eng)
-reload(designFileHandle)
-reload(pfsDesign)
+
 reload(pfsConfigUtils)
-reload(ingestPfsDesign)
 
 
 class FpsCmd(object):
@@ -561,26 +556,24 @@ class FpsCmd(object):
 
     def cobraMoveSteps(self, cmd):
         """Move single cobra in steps. """
-
         cmdKeys = cmd.cmd.keywords
 
         # Switch from default no centroids to default do centroids
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
-        __, goodIdx, badIdx = self.loadDesignHandle(designId=None, maskFile=maskFile,
-                                                    calibModel=self.cc.calibModel, fillNaN=False)
+        stepsize = cmd.cmd.keywords['stepsize'].values[0]
+
+        # loading mask file and moving only cobra with bitMask==1
+        goodIdx = self.loadGoodIdx(maskFile)
 
         # cobraList = np.array([1240,2051,2262,2278,2380,2393])-1
         cobras = self.cc.allCobras[goodIdx]
 
-        cmdKeys = cmd.cmd.keywords
-        stepsize = cmd.cmd.keywords['stepsize'].values[0]
-
         thetaSteps = np.zeros(len(cobras))
         phiSteps = np.zeros(len(cobras))
 
-        if theta is True:
+        if theta:
             self.logger.info(f'theta arm is activated, moving {stepsize} steps')
             thetaSteps = thetaSteps + stepsize
         else:
@@ -592,7 +585,7 @@ class FpsCmd(object):
         cmd.finish(f'text="cobraMoveSteps stepsize = {stepsize} completed"')
 
     def makeMotorMapwithGroups(self, cmd):
-        """ 
+        """
             Making theta and phi motor map in three groups for avoiding dots.
         """
         cmdKeys = cmd.cmd.keywords
@@ -719,61 +712,38 @@ class FpsCmd(object):
     def moveToHome(self, cmd):
         cmdKeys = cmd.cmd.keywords
 
-        self.actor.visitor.setOrGetVisit(cmd)
-
-        expTime = cmdKeys["expTime"].values[0] \
-            if "expTime" in cmdKeys \
-            else None
-
-        self.cc.expTime = expTime
-        cmd.inform(f'text="Setting moveToHome expTime={expTime}"')
-
+        expTime = cmdKeys['expTime'].values[0] if 'expTime' in cmdKeys else None
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
         phi = 'phi' in cmdKeys
         theta = 'theta' in cmdKeys
         allfiber = 'all' in cmdKeys
         noMCSexposure = 'noMCSexposure' in cmdKeys
 
-        if 'maskFile' in cmdKeys:
-            cmd.inform(f'text="maskFile = {maskFile}. Activating subset movement of cobra."')
-            maskFile = cmdKeys['maskFile'].values[0]
+        self.cc.expTime = expTime
+        cmd.inform(f'text="Setting moveToHome expTime={expTime}"')
 
-            designHandle = designFileHandle.DesignFileHandle(designId=None,
-                                                             maskFile=maskFile, calibModel=self.cc.calibModel)
+        self.actor.visitor.setOrGetVisit(cmd)
 
-            designHandle.loadMask()
-            goodIdx = designHandle.targetMoveIdx
-            badIdx = designHandle.targetNotMoveIdx
-            goodCobra = self.cc.allCobras[goodIdx]
+        # loading mask file and moving only cobra with bitMask==1
+        goodIdx = self.loadGoodIdx(maskFile)
+        goodCobra = self.cc.allCobras[goodIdx]
 
-        else:
-            maskFile = None
-            goodCobra = self.cc.allCobras[self.cc.goodIdx]
-
-        # Loading mask file when it is given.
-        if maskFile is not None:
-            designHandle.loadMask()
-            goodIdx = designHandle.targetMoveIdx
-            badIdx = designHandle.targetNotMoveIdx
-
-        if phi is True:
+        if phi:
             eng.setPhiMode()
-            self.cc.moveToHome(self.cc.goodCobras, phiEnable=True)
+            self.cc.moveToHome(goodCobra, phiEnable=True)
 
-        if theta is True:
+        if theta:
             eng.setThetaMode()
-            self.cc.moveToHome(self.cc.goodCobras, thetaEnable=True)
+            self.cc.moveToHome(goodCobra, thetaEnable=True)
 
-        if allfiber is True:
+        if allfiber:
             eng.setNormalMode()
             if noMCSexposure:
                 cmd.inform(f'text="noMCSExposure is {noMCSexposure}, skipping MCS operation."')
-                self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True,
-                                   thetaCCW=False, noMCS=True)
+                self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, thetaCCW=False, noMCS=True)
             else:
                 diff = self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, thetaCCW=False)
-                self.logger.info(f'Averaged position offset comapred with cobra center = {np.mean(diff)}')
-
-        # self.logger.info(f'The current phi angle = {eng.}')
+                self.logger.info(f'Averaged position offset compared with cobra center = {np.mean(diff)}')
 
         cmd.finish(f'text="Moved all arms back to home"')
 
@@ -804,7 +774,7 @@ class FpsCmd(object):
         scale = transMatrix['x_scale'].values[0]
         xoffset = transMatrix['x_trans'].values[0]
         yoffset = transMatrix['y_trans'].values[0]
-        # Always 
+        # Always
         angle = -transMatrix['angle'].values[0]
         self.logger.info(f'Latest matrix = {xoffset} {yoffset} scale = {scale}, angle={angle}')
 
@@ -1091,94 +1061,56 @@ class FpsCmd(object):
 
         cmd.finish(f'text="Motor on-time scan is finished."')
 
-    def loadDesignHandle(self, designId, maskFile, calibModel, fillNaN=False):
-        """Load designHandle and maskFile."""
+    def loadGoodIdx(self, maskFile):
+        """Return cobraIndex that is flagged to be moved."""
 
-        designHandle = designFileHandle.DesignFileHandle(designId=designId,
-                                                         maskFile=maskFile, calibModel=calibModel)
+        def loadMaskFile():
+            """Just return cobra index where bitMask==1"""
+            df = pd.read_csv(maskFile, index_col=0)
+            doMoveCobraIds = df[df.bitMask.astype('bool')].cobraId.to_numpy()
+            return doMoveCobraIds - 1
 
-        if fillNaN is True:
-            designHandle.fillCalibModelCenter()
-
-        # goodIdx = designHandle.goodIdx
-        # badIdx = designHandle.badIdx
-
-        # Loading mask file when it is given.
-        if maskFile is not None:
-            designHandle.loadMask()
-            goodIdx = designHandle.targetMoveIdx
-            badIdx = designHandle.targetNotMoveIdx
-        else:
-            goodIdx = self.cc.goodIdx
-            badIdx = self.cc.badIdx
-
-        # goodIdx = np.array(tuple(set(designHandle.targetMoveIdx) ^ set(self.cc.badIdx)))
-        # badIdx = np.array(tuple(set(self.cc.badIdx).union(set(designHandle.targetNotMoveIdx))))
-
-        self.logger.info(f"Mask file is {maskFile} badIdx = {badIdx}")
-
-        return designHandle, goodIdx, badIdx
+        doMove = self.cc.goodIdx if maskFile is None else loadMaskFile()
+        return self.cc.goodIdx[np.isin(self.cc.goodIdx, doMove)]
 
     def moveToPfsDesign(self, cmd):
         """ Move cobras to a PFS design. """
-
+        start = time.time()
         cmdKeys = cmd.cmd.keywords
-        designId = cmdKeys['designId'].values[0]
 
-        expTime = cmdKeys["expTime"].values[0] \
-            if "expTime" in cmdKeys \
-            else None
+        designId = cmdKeys['designId'].values[0]
+        expTime = cmdKeys['expTime'].values[0] if 'expTime' in cmdKeys else None
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
+        iteration = cmdKeys['iteration'].values[0] if 'iteration' in cmdKeys else 12
+        tolerance = cmdKeys['tolerance'].values[0] if 'tolerance' in cmdKeys else 0.01
+
+        twoSteps = 'twoStepsOff' not in cmdKeys
+        goHome = 'goHome' in cmdKeys
 
         self.cc.expTime = expTime
         cmd.inform(f'text="Setting moveToPfsDesign expTime={expTime}"')
-
-        # Adding aruments for iteration and tolerance
-        if 'maskFile' in cmdKeys:
-            maskFile = cmdKeys['maskFile'].values[0]
-        else:
-            maskFile = None
-
-        if 'iteration' in cmdKeys:
-            iteration = cmdKeys['iteration'].values[0]
-        else:
-            iteration = 12
-
-        if 'tolerance' in cmdKeys:
-            tolerance = cmdKeys['tolerance'].values[0]
-        else:
-            tolerance = 0.01
-
-        cmd.inform(f'text="Running moveToPfsDeign with tolerance={tolerance} iteration={iteration}"')
+        cmd.inform(f'text="Running moveToPfsDesign with tolerance={tolerance} iteration={iteration} "')
+        cmd.inform(f'text="moveToPfsDesign with twoSteps={twoSteps} goHome={goHome}"')
 
         # import pdb; pdb.set_trace()
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        twoStepsOff = 'twoStepsOff' in cmdKeys
-        if twoStepsOff:
-            twoSteps = False
-        else:
-            twoSteps = True
+        # making base pfsConfig.
+        pfsConfig = pfsConfigUtils.makeVanillaPfsConfig(designId, visit0=visit)
+        # just a placeholder for now...
+        pfsConfigUtils.updatePfiNominal(pfsConfig)
 
-        # import pdb; pdb.set_trace()
-        cmd.inform(f'text="moveToPfsDeign with twoSteps={twoSteps}"')
-
-        if 'goHome' in cmdKeys:
-            goHome = True
-        else:
-            goHome = False
-        cmd.inform(f'text="users asked to move back home ={goHome}"')
+        targets, isNan = pfsConfigUtils.makeTargetsArray(pfsConfig)
+        # setting NaN targets to centers + (0.5+0.5j)
+        targets[isNan] = self.cc.calibModel.centers[isNan] + (0.5 + 0.5j)
 
         cmd.inform(f'text="Setting good cobra index"')
-        goodIdx = self.cc.goodIdx
+        # loading mask file and moving only cobra with bitMask==1
+        goodIdx = self.loadGoodIdx(maskFile)
 
-        designHandle, targetGoodIdx, targetBadIdx = self.loadDesignHandle(designId,
-                                                                          maskFile, self.cc.calibModel, fillNaN=True)
-        designTargets = designHandle.targets
-
-        goodIdx = self.cc.goodIdx
-        targets = designHandle.targets[goodIdx]
-
+        targets = targets[goodIdx]
         cobras = self.cc.allCobras[goodIdx]
+
         thetaSolution, phiSolution, flags = self.cc.pfi.positionsToAngles(cobras, targets)
         valid = (flags[:, 0] & self.cc.pfi.SOLUTION_OK) != 0
         if not np.all(valid):
@@ -1189,17 +1121,16 @@ class FpsCmd(object):
         phis = phiSolution[:, 0]
 
         # Here we start to deal with target table
-        self.cc.trajectoryMode = True
         cmd.inform(f'text="Handling the cobra target table."')
-        traj, moves = eng.createTrajectory(goodIdx, thetas, phis, tries=iteration, twoSteps=True, threshold=2.0,
-                                           timeStep=500)
+        self.cc.trajectoryMode = True
+        traj, moves = eng.createTrajectory(goodIdx, thetas, phis,
+                                           tries=iteration, twoSteps=True, threshold=2.0, timeStep=500)
 
         cmd.inform(f'text="Reset the current angles for cobra arms."')
-
         self.cc.trajectoryMode = False
-        thetaHome = ((self.cc.calibModel.tht1 - self.cc.calibModel.tht0 + np.pi)
-                     % (np.pi * 2) + np.pi)
-        if goHome is True:
+        thetaHome = ((self.cc.calibModel.tht1 - self.cc.calibModel.tht0 + np.pi) % (np.pi * 2) + np.pi)
+
+        if goHome:
             cmd.inform(f'text="Setting ThetaAngle = Home and phiAngle = 0."')
             self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=thetaHome, phiAngles=0)
         else:
@@ -1248,7 +1179,8 @@ class FpsCmd(object):
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0, :, 2:] = \
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance,
-                                 tries=iteration - 2, homed=False,
+                                 tries=iteration - 2,
+                                 homed=False,
                                  newDir=False, thetaFast=False, phiFast=True, threshold=2.0,
                                  thetaMargin=np.deg2rad(15.0))
         else:
@@ -1257,27 +1189,28 @@ class FpsCmd(object):
                                                                  phis, relative=False, local=True, tolerance=tolerance,
                                                                  tries=iteration, homed=goHome,
                                                                  newDir=True, thetaFast=False, phiFast=False,
-                                                                 threshold=2.0, thetaMargin=np.deg2rad(15.0))
-
+                                                                 threshold=2.0,
+                                                                 thetaMargin=np.deg2rad(15.0))
         self.atThetas = atThetas
         self.atPhis = atPhis
 
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
 
-        # write pfsConfig
-        pfsConfig = pfsConfigUtils.writePfsConfig(pfsDesignId=designId, visitId=visit)
+        # update pfiCenter.
+        maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, cmd=cmd)
 
-        # insert into opdb
-        try:
-            ingestPfsDesign.ingestPfsConfig(pfsConfig, allocated_at='now')
-            cmd.inform(f'text="{pfsConfig.filename} successfully inserted in opdb !"')
-        except Exception as e:
-            cmd.warn(f'text="ingestPfsConfig failed with {str(e)}, ignoring for now..."')
+        # write pfsConfig to disk.
+        pfsConfigUtils.writePfsConfig(pfsConfig, cmd=cmd)
 
-        # np.save(dataPath / 'badMoves', badMoves)
+        # insert into opdb.
+        pfsConfigUtils.ingestPfsConfig(pfsConfig,
+                                       allocated_at='now',
+                                       converg_num_iter=maxIteration,
+                                       converg_elapsed_time=round(time.time() - start, 3),
+                                       cmd=cmd)
 
-        cmd.finish(f'text="We are at design position. Do the work punk!"')
+        cmd.finish('text="We are at design position. Do the work punk!"')
 
     def loadDotScales(self, cmd):
         """Load step scaling just for the dot traversal loop. """
