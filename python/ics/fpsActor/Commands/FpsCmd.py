@@ -1151,6 +1151,8 @@ class FpsCmd(object):
         self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
         if twoSteps:
+            convergeceStatus = 'in progress'
+            cmd.inform(f'pfsConfig="{designId},{pfsConfig.filename},{visit},{convergeceStatus}"')
             cIds = goodIdx
 
             moves = np.zeros((1, len(cIds), iteration), dtype=eng.moveDtype)
@@ -1210,6 +1212,9 @@ class FpsCmd(object):
                                        converg_elapsed_time=round(time.time() - start, 3),
                                        cmd=cmd)
 
+        convergeceStatus = 'done'
+        cmd.inform(f'pfsConfig="{designId},{pfsConfig.filename},{visit},{convergeceStatus}"')   
+        
         cmd.finish('text="We are at design position. Do the work punk!"')
 
     def loadDotScales(self, cmd):
