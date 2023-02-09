@@ -133,7 +133,6 @@ class FpsCmd(object):
                                         keys.Key("theta", types.Float(), help="Distance to move theta"),
                                         keys.Key("phi", types.Float(), help="Distance to move phi"),
                                         keys.Key("board", types.Int(), help="board index 1-84"),
-                                        keys.Key("convergence", types.String(), help="Convergence status"),
                                         keys.Key("stepsPerMove", types.Int(), default=-50,
                                                  help="number of steps per move")
                                         )
@@ -1152,7 +1151,8 @@ class FpsCmd(object):
         self.cc.pfi.resetMotorScaling(self.cc.allCobras)
 
         if twoSteps:
-            cmdKeys['convergence'] = 'in progress'
+            convergeceStatus = 'in progress'
+            cmd.inform(f'pfsConfig="{designId},{pfsConfig.filename},{visit},{convergeceStatus}"')
             cIds = goodIdx
 
             moves = np.zeros((1, len(cIds), iteration), dtype=eng.moveDtype)
@@ -1212,6 +1212,9 @@ class FpsCmd(object):
                                        converg_elapsed_time=round(time.time() - start, 3),
                                        cmd=cmd)
 
+        convergeceStatus = 'done'
+        cmd.inform(f'pfsConfig="{designId},{pfsConfig.filename},{visit},{convergeceStatus}"')   
+        
         cmd.finish('text="We are at design position. Do the work punk!"')
 
     def loadDotScales(self, cmd):
