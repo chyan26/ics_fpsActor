@@ -171,16 +171,15 @@ class FpsCmd(object):
             return self.db
 
         try:
-            config = self.actor.config
-            hostname = config.get('db', 'hostname')
-            dbname = config.get('db', 'dbname', fallback='opdb')
-            port = config.get('db', 'port', fallback=5432)
-            username = config.get('db', 'username', fallback='pfs')
-        except Exception as e:
-            raise RuntimeError(f'failed to load opdb configuration: {e}')
+            dbConfig = self.actor.actorConfig['opdb']
+        except KeyError:
+            dbConfig = dict()
 
         try:
-            _db = opdb.OpDB(hostname, port, dbname, username)
+            _db = opdb.OpDB(hostname=dbConfig.get('hostname', 'db-ics'),
+                            port=dbConfig.get('port', 5432),
+                            dbname=dbConfig.get('dbname', 'opdb'),
+                            user=dbConfig.get('user', 'pfs'))
             _db.connect()
         except:
             raise RuntimeError("unable to connect to the database")
@@ -1140,7 +1139,7 @@ class FpsCmd(object):
 
         targetTable = traj.calculateFiberPositions(self.cc)
 
-        cobraTargetTable = najaVenator.cobraTargetTable(visit, iteration, self.cc.calibModel)
+        cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel)
         cobraTargetTable.makeTargetTable(moves, self.cc)
         cobraTargetTable.writeTargetTable()
 
