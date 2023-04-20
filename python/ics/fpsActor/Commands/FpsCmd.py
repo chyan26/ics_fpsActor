@@ -1199,7 +1199,7 @@ class FpsCmd(object):
         np.save(dataPath / 'moves', moves)
 
         # update pfiCenter.
-        maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, cmd=cmd)
+        maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, self.cc.calibModel, cmd=cmd)
 
         # write pfsConfig to disk.
         pfsConfigUtils.writePfsConfig(pfsConfig, cmd=cmd)
