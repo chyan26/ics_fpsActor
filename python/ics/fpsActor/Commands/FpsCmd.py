@@ -722,7 +722,7 @@ class FpsCmd(object):
 
         doWrite, fullPath = pfsDesignUtils.writeDesign(pfsDesign)
         if doWrite:
-            cmd.inform(f'text="wrote {fullPath}" to disk !')
+            cmd.inform(f'text="wrote {fullPath} to disk !"')
 
         cmd.finish(f'fpsDesignId=0x{pfsDesign.pfsDesignId:016x}')
 
