@@ -70,7 +70,9 @@ class FpsCmd(object):
             ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
 
-            ('createHomeDesign', '[<maskFile>]',self.createHomeDesign),
+            ('createHomeDesign', '[<maskFile>]', self.createHomeDesign),
+            ('createBlackDotDesign', '[<maskFile>]', self.createBlackDotDesign),
+            ('genPfsConfigFromMcs', '<visit> <designId>', self.genPfsConfigFromMcs),
             ('moveToHome', '@(phi|theta|all) [<expTime>] [@noMCSexposure] [<visit>] [<maskFile>] [<designId>]', self.moveToHome),
 
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
@@ -718,13 +720,58 @@ class FpsCmd(object):
         # making home pfsDesign.
         maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
         goodIdx = self.loadGoodIdx(maskFile)
-        pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx)
+
+        pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx, maskFile)
 
         doWrite, fullPath = pfsDesignUtils.writeDesign(pfsDesign)
         if doWrite:
             cmd.inform(f'text="wrote {fullPath} to disk !"')
 
         cmd.finish(f'fpsDesignId=0x{pfsDesign.pfsDesignId:016x}')
+
+    def createBlackDotDesign(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        # making home pfsDesign.
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
+        goodIdx = self.loadGoodIdx(maskFile)
+
+        nestor = butler.Butler()
+        dots = nestor.get('black_dots')
+
+        pfsDesign = pfsDesignUtils.createBlackDotDesign(dots, goodIdx, maskFile)
+
+        doWrite, fullPath = pfsDesignUtils.writeDesign(pfsDesign)
+        if doWrite:
+            cmd.inform(f'text="wrote {fullPath} to disk !"')
+
+        cmd.finish(f'fpsDesignId=0x{pfsDesign.pfsDesignId:016x}')
+
+    def genPfsConfigFromMcs(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        designId = cmdKeys['designId'].values[0]
+
+        visit = self.actor.visitor.setOrGetVisit(cmd)
+        pfsDesign = pfsDesignUtils.readDesign(designId)
+
+        # making base pfsConfig.
+        pfsConfig = pfsConfigUtils.pfsConfigFromDesign(pfsDesign, visit0=visit)
+        cmd.inform(f'pfsConfig=0x{pfsDesign.pfsDesignId:016x},{visit},inProgress')
+        start = time.time()
+
+        maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, self.cc.calibModel, cmd=cmd)
+
+        # write pfsConfig to disk.
+        pfsConfigUtils.writePfsConfig(pfsConfig, cmd=cmd)
+        # insert into opdb.
+        pfsConfigUtils.ingestPfsConfig(pfsConfig,
+                                       allocated_at='now',
+                                       converg_num_iter=maxIteration,
+                                       converg_elapsed_time=round(time.time() - start, 3),
+                                       cmd=cmd)
+
+        cmd.finish(f'pfsConfig=0x{pfsConfig.pfsDesignId:016x},{visit},Done')
 
     def moveToHome(self, cmd):
         cmdKeys = cmd.cmd.keywords

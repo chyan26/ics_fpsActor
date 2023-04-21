@@ -9,6 +9,15 @@ from pfs.utils.fiberids import FiberIds
 pfsDesignDir = '/data/pfsDesign'
 
 
+def makeDesignName(flavour, maskFile):
+    """construct pfsDesign name."""
+    if not maskFile:
+        return flavour
+
+    _, maskFileName = os.path.split(os.path.splitext(maskFile)[0])
+    return f'{flavour}-{maskFileName}'
+
+
 def readDesign(pfsDesignId):
     """Read PfsDesign from pfsDesignDir."""
     return PfsDesign.read(pfsDesignId=pfsDesignId, dirName=pfsDesignDir)
@@ -25,7 +34,7 @@ def writeDesign(pfsDesign):
     return doWrite, fullPath
 
 
-def createHomeDesign(calibModel, goodIdx):
+def createHomeDesign(calibModel, goodIdx, maskFile):
     """Create home design from current calibModel, ra and dec are faked."""
     gfm = pd.DataFrame(FiberIds().data)
     sgfm = gfm.set_index('scienceFiberId').loc[np.arange(2394) + 1].reset_index().sort_values('cobraId')
@@ -42,12 +51,47 @@ def createHomeDesign(calibModel, goodIdx):
     sgfm.loc[~MOVE_MASK, 'x'] = np.NaN
     sgfm.loc[~MOVE_MASK, 'y'] = np.NaN
 
+    # faking ra and dec.
     pfiNominal = sgfm.sort_values('fiberId')[['x', 'y']].to_numpy()
     ra = 100 + 1e-3 * pfiNominal[:, 0]
     dec = 100 + 1e-3 * pfiNominal[:, 1]
 
+    # setting designName.
+    designName = makeDesignName('cobraHome', maskFile)
+
     pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
-                                             arms='brn', designName='cobraHome')
+                                             arms='brn', designName=designName)
+
+    return pfsDesign
+
+
+def createBlackDotDesign(dots, goodIdx, maskFile):
+    """Create blac dots design from current dots position, ra and dec are faked."""
+    gfm = pd.DataFrame(FiberIds().data)
+    sgfm = gfm.set_index('scienceFiberId').loc[np.arange(2394) + 1].reset_index().sort_values('cobraId')
+    sgfm['x'] = dots.x.to_numpy()
+    sgfm['y'] = dots.y.to_numpy()
+
+    # setting targetType.
+    MOVE_MASK = np.isin(sgfm.cobraId - 1, goodIdx)
+    sgfm['targetType'] = TargetType.UNASSIGNED
+    sgfm.loc[MOVE_MASK, 'targetType'] = TargetType.BLACKSPOT
+    targetType = sgfm.sort_values('fiberId').targetType.to_numpy()
+
+    # setting position to NaN where no target.
+    sgfm.loc[~MOVE_MASK, 'x'] = np.NaN
+    sgfm.loc[~MOVE_MASK, 'y'] = np.NaN
+
+    # faking ra and dec.
+    pfiNominal = sgfm.sort_values('fiberId')[['x', 'y']].to_numpy()
+    ra = 100 + 1e-3 * pfiNominal[:, 0]
+    dec = 100 + 1e-3 * pfiNominal[:, 1]
+
+    # setting designName.
+    designName = makeDesignName('blackDots', maskFile)
+
+    pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
+                                             arms='brn', designName=designName)
 
     return pfsDesign
 
