@@ -83,7 +83,7 @@ class NajaVenator(object):
         conn = self._dbConn
 
         sql = f"""SELECT * from mcs_data WHERE mcs_frame_id={frameId}"""
-        df = conn.bulkSELECT('mcs_data', sql)
+        df = conn.bulkSelect('mcs_data', sql)
 
         # We got a full table, with original names. Trim and rename to
         # what is expected here.
