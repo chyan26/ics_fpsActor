@@ -69,7 +69,10 @@ class FpsCmd(object):
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
-            ('moveToHome', '@(phi|theta|all) [<expTime>] [@noMCSexposure] [<visit>] [<maskFile>]', self.moveToHome),
+
+            ('createHomeDesign', '[<maskFile>]',self.createHomeDesign),
+            ('moveToHome', '@(phi|theta|all) [<expTime>] [@noMCSexposure] [<visit>] [<maskFile>] [<designId>]', self.moveToHome),
+
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign',
@@ -709,6 +712,20 @@ class FpsCmd(object):
 
         cmd.finish(f'Motor map sequence finished')
 
+    def createHomeDesign(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        # making home pfsDesign.
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
+        goodIdx = self.loadGoodIdx(maskFile)
+        pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx)
+
+        doWrite, fullPath = pfsDesignUtils.writeDesign(pfsDesign)
+        if doWrite:
+            cmd.inform(f'text="wrote {fullPath}" to disk !')
+
+        cmd.finish(f'fpsDesignId=0x{pfsDesign.pfsDesignId:016x}')
+
     def moveToHome(self, cmd):
         cmdKeys = cmd.cmd.keywords
 
@@ -718,19 +735,25 @@ class FpsCmd(object):
         theta = 'theta' in cmdKeys
         allfiber = 'all' in cmdKeys
         noMCSexposure = 'noMCSexposure' in cmdKeys
+        designId = cmdKeys['designId'].values[0] if 'designId' in cmdKeys else None
 
         self.cc.expTime = expTime
         cmd.inform(f'text="Setting moveToHome expTime={expTime}"')
 
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        # loading mask file and moving only cobra with bitMask==1
-        goodIdx = self.loadGoodIdx(maskFile)
+        # create or load design.
+        if designId:
+            pfsDesign = pfsDesignUtils.readDesign(designId)
+            cobraIndex = pfsDesignUtils.homeMaskFromDesign(pfsDesign)
+            goodIdx = self.cc.goodIdx[np.isin(self.cc.goodIdx, cobraIndex)]
+        else:
+            # loading mask file and moving only cobra with bitMask==1
+            goodIdx = self.loadGoodIdx(maskFile)
+            pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx)
+
         goodCobra = self.cc.allCobras[goodIdx]
 
-        # making home pfsDesign.
-        pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx)
-        cmd.inform(f'pfsConfig=0x{pfsDesign.pfsDesignId:016x},{visit},Preparing')
         # making base pfsConfig.
         pfsConfig = pfsConfigUtils.pfsConfigFromDesign(pfsDesign, visit0=visit)
         cmd.inform(f'pfsConfig=0x{pfsDesign.pfsDesignId:016x},{visit},inProgress')
@@ -769,7 +792,7 @@ class FpsCmd(object):
                                        converg_elapsed_time=round(time.time() - start, 3),
                                        cmd=cmd)
 
-        cmd.inform(f'pfsConfig=0x{pfsConfig.designId:016x},{visit},Done')
+        cmd.inform(f'pfsConfig=0x{pfsConfig.pfsDesignId:016x},{visit},Done')
         cmd.finish(f'text="Moved all arms back to home"')
 
     def cobraAndDotRecenter(self, cmd):

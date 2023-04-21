@@ -5,11 +5,10 @@ import pfs.utils.pfsConfigUtils as pfsConfigUtils
 from opdb import opdb
 from pfs.datamodel import PfsDesign, PfsConfig, FiberStatus
 from pfs.utils.fiberids import FiberIds
+from ics.fpsActor.utils.pfsDesign import readDesign
 
 __all__ = ["pfsConfigFromDesign", "makeVanillaPfsConfig", "makeTargetsArray", "updatePfiNominal",
            "updatePfiCenter", "writePfsConfig", "ingestPfsConfig"]
-
-pfsDesignDir = '/data/pfsDesign'
 
 
 def pfsConfigFromDesign(pfsDesign, visit0):
@@ -19,7 +18,7 @@ def pfsConfigFromDesign(pfsDesign, visit0):
 
 def makeVanillaPfsConfig(pfsDesignId, visit0):
     """Load pfsDesign and return a PfsConfig file identical to PfsDesign."""
-    pfsDesign = PfsDesign.read(pfsDesignId=pfsDesignId, dirName=pfsDesignDir)
+    pfsDesign = readDesign(pfsDesignId)
     return pfsConfigFromDesign(pfsDesign, visit0)
 
 
