@@ -11,6 +11,7 @@ import cv2
 import ics.cobraCharmer.pfiDesign as pfiDesign
 import ics.fpsActor.boresightMeasurements as fpsTools
 import ics.fpsActor.utils.pfsConfig as pfsConfigUtils
+import ics.fpsActor.utils.pfsDesign as pfsDesignUtils
 import numpy as np
 import opscore.protocols.keys as keys
 import opscore.protocols.types as types
@@ -68,7 +69,10 @@ class FpsCmd(object):
             ('movePhiForThetaOps', '<runDir>', self.movePhiForThetaOps),
             ('movePhiForDots', '<angle> <iteration> [<visit>]', self.movePhiForDots),
             ('movePhiToAngle', '<angle> <iteration> [<visit>]', self.movePhiToAngle),
-            ('moveToHome', '@(phi|theta|all) [<expTime>] [@noMCSexposure] [<visit>] [<maskFile>]', self.moveToHome),
+
+            ('createHomeDesign', '[<maskFile>]',self.createHomeDesign),
+            ('moveToHome', '@(phi|theta|all) [<expTime>] [@noMCSexposure] [<visit>] [<maskFile>] [<designId>]', self.moveToHome),
+
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign',
@@ -708,6 +712,20 @@ class FpsCmd(object):
 
         cmd.finish(f'Motor map sequence finished')
 
+    def createHomeDesign(self, cmd):
+        cmdKeys = cmd.cmd.keywords
+
+        # making home pfsDesign.
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
+        goodIdx = self.loadGoodIdx(maskFile)
+        pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx)
+
+        doWrite, fullPath = pfsDesignUtils.writeDesign(pfsDesign)
+        if doWrite:
+            cmd.inform(f'text="wrote {fullPath}" to disk !')
+
+        cmd.finish(f'fpsDesignId=0x{pfsDesign.pfsDesignId:016x}')
+
     def moveToHome(self, cmd):
         cmdKeys = cmd.cmd.keywords
 
@@ -717,15 +735,29 @@ class FpsCmd(object):
         theta = 'theta' in cmdKeys
         allfiber = 'all' in cmdKeys
         noMCSexposure = 'noMCSexposure' in cmdKeys
+        designId = cmdKeys['designId'].values[0] if 'designId' in cmdKeys else None
 
         self.cc.expTime = expTime
         cmd.inform(f'text="Setting moveToHome expTime={expTime}"')
 
-        self.actor.visitor.setOrGetVisit(cmd)
+        visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        # loading mask file and moving only cobra with bitMask==1
-        goodIdx = self.loadGoodIdx(maskFile)
+        # create or load design.
+        if designId:
+            pfsDesign = pfsDesignUtils.readDesign(designId)
+            cobraIndex = pfsDesignUtils.homeMaskFromDesign(pfsDesign)
+            goodIdx = self.cc.goodIdx[np.isin(self.cc.goodIdx, cobraIndex)]
+        else:
+            # loading mask file and moving only cobra with bitMask==1
+            goodIdx = self.loadGoodIdx(maskFile)
+            pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx)
+
         goodCobra = self.cc.allCobras[goodIdx]
+
+        # making base pfsConfig.
+        pfsConfig = pfsConfigUtils.pfsConfigFromDesign(pfsDesign, visit0=visit)
+        cmd.inform(f'pfsConfig=0x{pfsDesign.pfsDesignId:016x},{visit},inProgress')
+        start = time.time()
 
         if phi:
             eng.setPhiMode()
@@ -744,6 +776,23 @@ class FpsCmd(object):
                 diff = self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, thetaCCW=False)
                 self.logger.info(f'Averaged position offset compared with cobra center = {np.mean(diff)}')
 
+        # update pfiCenter.
+        if noMCSexposure:
+            maxIteration = 0
+            pfsConfig.pfiCenter[:] = np.NaN  # we don't know where we are.
+        else:
+            maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, self.cc.calibModel, cmd=cmd)
+
+        # write pfsConfig to disk.
+        pfsConfigUtils.writePfsConfig(pfsConfig, cmd=cmd)
+        # insert into opdb.
+        pfsConfigUtils.ingestPfsConfig(pfsConfig,
+                                       allocated_at='now',
+                                       converg_num_iter=maxIteration,
+                                       converg_elapsed_time=round(time.time() - start, 3),
+                                       cmd=cmd)
+
+        cmd.inform(f'pfsConfig=0x{pfsConfig.pfsDesignId:016x},{visit},Done')
         cmd.finish(f'text="Moved all arms back to home"')
 
     def cobraAndDotRecenter(self, cmd):
