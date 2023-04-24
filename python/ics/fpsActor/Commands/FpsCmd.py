@@ -1198,7 +1198,7 @@ class FpsCmd(object):
 
         targets, isNan = pfsConfigUtils.makeTargetsArray(pfsConfig)
         # setting NaN targets to centers + (0.5+0.5j)
-        targets[isNan] = self.cc.calibModel.centers[isNan] + (0.5 + 0.5j)
+        targets[isNan] = self.cc.calibModel.centers[isNan] + (0.04 + 0.04j)
 
         cmd.inform(f'text="Setting good cobra index"')
         # loading mask file and moving only cobra with bitMask==1
