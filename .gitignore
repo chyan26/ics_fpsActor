@@ -2,3 +2,9 @@
 /.pydevproject
 .env
 *.pyc
+__pycache__
+.gitignore
+python/ics/fpsActor/__pycache__/*.pyc
+python/ics/fpsActor/Commands/__pycache__/*.pyc
+python/ics/fpsActor/utils/__pycache__/*.pyc
+python/ics/fpsActor/__pycache__/fpsFunction.cpython-38.pyc
