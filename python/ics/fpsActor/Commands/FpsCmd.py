@@ -797,7 +797,7 @@ class FpsCmd(object):
         else:
             # loading mask file and moving only cobra with bitMask==1
             goodIdx = self.loadGoodIdx(maskFile)
-            pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx)
+            pfsDesign = pfsDesignUtils.createHomeDesign(self.cc.calibModel, goodIdx, maskFile=False)
 
         goodCobra = self.cc.allCobras[goodIdx]
 
