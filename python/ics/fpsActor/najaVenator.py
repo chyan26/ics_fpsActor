@@ -157,7 +157,7 @@ class CobraTargetTable(object):
         self.interation = 1
         self.calibModel = calibModel
 
-    def makeTargetTable(self, moves, cobraCoach):
+    def makeTargetTable(self, moves, cobraCoach, goodIdx):
         """Make the target table for the convergence move."""
         cc = cobraCoach
 
@@ -194,7 +194,7 @@ class CobraTargetTable(object):
                 targetTable['pfi_nominal_x_mm'].append(self.calibModel.centers[idx].real)
                 targetTable['pfi_nominal_y_mm'].append(self.calibModel.centers[idx].imag)
 
-                if idx in cc.badIdx:
+                if idx in cc.badIdx or idx not in goodIdx:
                     # Using cobra center for bad cobra targets
                     targetTable['pfi_target_x_mm'].append(self.calibModel.centers[idx].real)
                     targetTable['pfi_target_y_mm'].append(self.calibModel.centers[idx].imag)
@@ -204,15 +204,15 @@ class CobraTargetTable(object):
 
                 else:
                     if iteration < 2:
-                        targetTable['pfi_target_x_mm'].append(firstStepMove[cc.goodIdx == idx].real[0])
-                        targetTable['pfi_target_y_mm'].append(firstStepMove[cc.goodIdx == idx].imag[0])
-                        targetTable['motor_target_theta'].append(firstThetaAngle[cc.goodIdx == idx][0])
-                        targetTable['motor_target_phi'].append(firstPhiAngle[cc.goodIdx == idx][0])
+                        targetTable['pfi_target_x_mm'].append(firstStepMove[goodIdx == idx].real[0])
+                        targetTable['pfi_target_y_mm'].append(firstStepMove[goodIdx == idx].imag[0])
+                        targetTable['motor_target_theta'].append(firstThetaAngle[goodIdx == idx][0])
+                        targetTable['motor_target_phi'].append(firstPhiAngle[goodIdx == idx][0])
                     else:
-                        targetTable['pfi_target_x_mm'].append(targetStepMove[cc.goodIdx == idx].real[0])
-                        targetTable['pfi_target_y_mm'].append(targetStepMove[cc.goodIdx == idx].imag[0])
-                        targetTable['motor_target_theta'].append(targetThetaAngle[cc.goodIdx == idx][0])
-                        targetTable['motor_target_phi'].append(targetPhiAngle[cc.goodIdx == idx][0])
+                        targetTable['pfi_target_x_mm'].append(targetStepMove[goodIdx == idx].real[0])
+                        targetTable['pfi_target_y_mm'].append(targetStepMove[goodIdx == idx].imag[0])
+                        targetTable['motor_target_theta'].append(targetThetaAngle[goodIdx == idx][0])
+                        targetTable['motor_target_phi'].append(targetPhiAngle[goodIdx == idx][0])
 
         self.dataTable = pd.DataFrame(targetTable)
 

@@ -1236,7 +1236,7 @@ class FpsCmd(object):
         targetTable = traj.calculateFiberPositions(self.cc)
 
         cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel)
-        cobraTargetTable.makeTargetTable(moves, self.cc)
+        cobraTargetTable.makeTargetTable(moves, self.cc, goodIdx)
         cobraTargetTable.writeTargetTable()
 
         # adjust theta angles that is too closed to the CCW hard stops
