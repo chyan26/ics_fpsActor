@@ -9,3 +9,6 @@ python/ics/fpsActor/Commands/__pycache__/*.pyc
 python/ics/fpsActor/utils/__pycache__/*.pyc
 python/ics/fpsActor/__pycache__/fpsFunction.cpython-38.pyc
 python/fpsActor
+**/__pycache__/*
+*.py[cod]
+python/ics/fpsActor/utils/__pycache__/pfsDesign.cpython-38.pyc
