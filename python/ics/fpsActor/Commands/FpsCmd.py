@@ -1191,7 +1191,7 @@ class FpsCmd(object):
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
         # making base pfsConfig.
-        pfsConfig = pfsConfigUtils.makeVanillaPfsConfig(designId, visit0=visit)
+        pfsConfig = pfsConfigUtils.makeVanillaPfsConfig(designId, visit0=visit, maskFile=maskFile)
         cmd.inform(f'pfsConfig=0x{designId:016x},{visit},Preparing')
         # just a placeholder for now...
         pfsConfigUtils.updatePfiNominal(pfsConfig)

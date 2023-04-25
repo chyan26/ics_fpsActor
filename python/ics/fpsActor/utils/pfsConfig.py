@@ -2,10 +2,10 @@ import numpy as np
 import pandas as pd
 import pfs.utils.ingestPfsDesign as ingestPfsDesign
 import pfs.utils.pfsConfigUtils as pfsConfigUtils
-from opdb import opdb
-from pfs.datamodel import PfsDesign, PfsConfig, FiberStatus
-from pfs.utils.fiberids import FiberIds
 from ics.fpsActor.utils.pfsDesign import readDesign
+from opdb import opdb
+from pfs.datamodel import PfsConfig, FiberStatus, TargetType
+from pfs.utils.fiberids import FiberIds
 
 __all__ = ["pfsConfigFromDesign", "makeVanillaPfsConfig", "makeTargetsArray", "updatePfiNominal",
            "updatePfiCenter", "writePfsConfig", "ingestPfsConfig"]
@@ -16,9 +16,19 @@ def pfsConfigFromDesign(pfsDesign, visit0):
     return PfsConfig.fromPfsDesign(pfsDesign=pfsDesign, visit=visit0, pfiCenter=pfsDesign.pfiNominal)
 
 
-def makeVanillaPfsConfig(pfsDesignId, visit0):
+def makeVanillaPfsConfig(pfsDesignId, visit0, maskFile=None):
     """Load pfsDesign and return a PfsConfig file identical to PfsDesign."""
     pfsDesign = readDesign(pfsDesignId)
+
+    if maskFile:
+        # retrieving masked cobras/fibers.
+        maskFile = pd.read_csv(maskFile, index_col=0)
+        noTarget = maskFile[maskFile.bitMask == 0]
+        noEng = pfsDesign.targetType != TargetType.ENGINEERING,
+        # setting non-engineering fiber which are masked to UNASSIGNED.
+        noTargetMask = np.logical_and(noEng, np.isin(pfsDesign.fiberId, noTarget.fiberId))
+        pfsDesign.targetType[noTargetMask] = TargetType.UNASSIGNED
+
     return pfsConfigFromDesign(pfsDesign, visit0)
 
 
