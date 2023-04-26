@@ -24,7 +24,7 @@ def makeVanillaPfsConfig(pfsDesignId, visit0, maskFile=None):
         # retrieving masked cobras/fibers.
         maskFile = pd.read_csv(maskFile, index_col=0)
         noTarget = maskFile[maskFile.bitMask == 0]
-        noEng = pfsDesign.targetType != TargetType.ENGINEERING,
+        noEng = pfsDesign.targetType != TargetType.ENGINEERING
         # setting non-engineering fiber which are masked to UNASSIGNED.
         noTargetMask = np.logical_and(noEng, np.isin(pfsDesign.fiberId, noTarget.fiberId))
         pfsDesign.targetType[noTargetMask] = TargetType.UNASSIGNED
