@@ -96,7 +96,7 @@ class FpsCmd(object):
             ('testLoop', '[<visit>] [<expTime>] [<cnt>] [@noMatching]',
              self.testIteration),  # Historical alias.
             ('cobraMoveSteps', '@(phi|theta) <stepsize> [<maskFile>]', self.cobraMoveSteps),
-            ('cobraMoveAngles', '@(phi|theta) <angle>', self.cobraMoveAngles),
+            ('cobraMoveAngles', '@(phi|theta) <angle> [<maskFile>]', self.cobraMoveAngles),
             ('loadDotScales', '[<filename>]', self.loadDotScales),
             ('updateDotLoop', '<filename> [<stepsPerMove>] [@noMove]', self.updateDotLoop),
             ('testDotMove', '[<stepsPerMove>]', self.testDotMove),
@@ -541,8 +541,12 @@ class FpsCmd(object):
 
         # Switch from default no centroids to default do centroids
         phi = 'phi' in cmdKeys
+        theta = 'theta' in cmdKeys
+        maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
+        # loading mask file and moving only cobra with bitMask==1
+        goodIdx = self.loadGoodIdx(maskFile)
 
-        cobras = self.cc.allCobras
+        cobras = self.cc.allCobras[goodIdx]
 
         cmdKeys = cmd.cmd.keywords
         angles = cmd.cmd.keywords['angle'].values[0]
