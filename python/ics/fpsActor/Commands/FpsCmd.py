@@ -180,17 +180,9 @@ class FpsCmd(object):
             dbConfig = self.actor.actorConfig['opdb']
         except KeyError:
             dbConfig = dict()
-
-        hostname = dbConfig['hostname']
-        dbname = dbConfig['dbname']
-        port = dbConfig['port']
-        username = dbConfig['username']
         
         try:    
-            _db = opdb.OpDB(hostname=hostname,
-                            port=dbname,
-                            dbname=port,
-                            user=username)
+            _db = opdb.OpDB(hostname='db-ics',port='5432',dbname='opdb',username='pfs')
             _db.connect()
         except:
             raise RuntimeError("unable to connect to the database")
