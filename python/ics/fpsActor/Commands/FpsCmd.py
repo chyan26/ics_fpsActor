@@ -181,11 +181,16 @@ class FpsCmd(object):
         except KeyError:
             dbConfig = dict()
 
-        try:
-            _db = opdb.OpDB(hostname=dbConfig.get('hostname', 'db-ics'),
-                            port=dbConfig.get('port', 5432),
-                            dbname=dbConfig.get('dbname', 'opdb'),
-                            user=dbConfig.get('user', 'pfs'))
+        hostname = dbConfig['hostname']
+        dbname = dbConfig['dbname']
+        port = dbConfig['port']
+        username = dbConfig['username']
+        
+        try:    
+            _db = opdb.OpDB(hostname=hostname,
+                            port=dbname,
+                            dbname=port,
+                            user=username)
             _db.connect()
         except:
             raise RuntimeError("unable to connect to the database")
