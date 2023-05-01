@@ -9,7 +9,7 @@ from importlib import reload
 
 import cv2
 import ics.cobraCharmer.pfiDesign as pfiDesign
-import ics.fpsActor.boresightMeasurements as fpsTools
+import ics.fpsActor.boresightMeasurements as boresightMeasure
 import ics.fpsActor.utils.pfsConfig as pfsConfigUtils
 import ics.fpsActor.utils.pfsDesign as pfsDesignUtils
 import numpy as np
@@ -1401,4 +1401,6 @@ class FpsCmd(object):
 
         # the routine will calculate the value and write to db
         db = self.connectToDB(cmd)
-        fpsTools.calcBoresight(db, frameIds, pfsVisitId)
+        boresightMeasure.calcBoresight(db, frameIds, pfsVisitId)
+
+        cmd.finish(f'text="Boresight calculation is finished."')
