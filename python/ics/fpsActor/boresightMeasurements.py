@@ -200,7 +200,7 @@ def refineBoresight(db, frameId1, frameId2, boresightEstimate):
     return [xc, yc]
 
 
-def calcBoresight(db, frameIds, pfsVisitId):
+def calcBoresight(cmd, db, frameIds, pfsVisitId, writeToDB=True):
 
     """
     wrapper for boresight calculationg.
@@ -217,8 +217,13 @@ def calcBoresight(db, frameIds, pfsVisitId):
 
     boresightEstimate = initialBoresight(db, frameIds)
     boresight = refineBoresight(db, frameIds[0], frameIds[1], boresightEstimate)
-
-    writeBoresightToDB(db, pfsVisitId, boresight)
+    
+    cmd.inform(f'text="Boresight values {boresight}."')
+    
+    if writeToDB is True:
+        writeBoresightToDB(db, pfsVisitId, boresight)
+    else:
+        cmd.inform(f'text="Not writing to DB."')
 
     return boresight
 
@@ -226,7 +231,8 @@ def loadCentroidsFromDB(db, mcsFrameId):
     """ retrieve a set of centroids from database and return as a numpy array"""
     
     sql = f'select mcs_data.spot_id, mcs_data.mcs_center_x_pix, mcs_data.mcs_center_y_pix from mcs_data where mcs_data.mcs_frame_id={mcsFrameId}'
-    df = db.fetch_query(sql)
+    df = db.bulkSelect('mcs_data',sql)
+    #df = db.fetch_query(sql)
     return df.to_numpy()
 
 def loadTelescopeParametersFromDB(db, frameId):

@@ -9,7 +9,7 @@ from importlib import reload
 
 import cv2
 import ics.cobraCharmer.pfiDesign as pfiDesign
-import ics.fpsActor.boresightMeasurements as fpsTools
+import ics.fpsActor.boresightMeasurements as boresightMeasure
 import ics.fpsActor.utils.pfsConfig as pfsConfigUtils
 import ics.fpsActor.utils.pfsDesign as pfsDesignUtils
 import numpy as np
@@ -89,7 +89,7 @@ class FpsCmd(object):
             ('angleConverge', '@(phi|theta) <angleTargets> [<visit>]', self.angleConverge),
             ('targetConverge', '@(ontime|speed) <totalTargets> <maxsteps> [<visit>]', self.targetConverge),
             ('motorOntimeSearch', '@(phi|theta) [<visit>]', self.motorOntimeSearch),
-            ('calculateBoresight', '[<startFrame>] [<endFrame>]', self.calculateBoresight),
+            ('calculateBoresight', '[<startFrame>] [<endFrame>] [@writeToDB]', self.calculateBoresight),
             ('testCamera', '[<visit>]', self.testCamera),
             ('testIteration', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),
             ('expose', '[<visit>] [<expTime>] [<cnt>]', self.testIteration),  # New alias
@@ -1389,6 +1389,13 @@ class FpsCmd(object):
         startFrame = cmdKeys['startFrame'].values[0]
         endFrame = cmdKeys['endFrame'].values[0]
 
+        if 'writeToDB' in cmdKeys:
+            writeToDB = True
+        else:
+            writeToDB = False
+        
+        cmd.inform(f'text="Write to DB is set to {writeToDB}."')
+
         # get a list of frameIds
         # two cases, for a single visitId, or multiple
         if (endFrame // 100 == startFrame // 100):
@@ -1401,4 +1408,6 @@ class FpsCmd(object):
 
         # the routine will calculate the value and write to db
         db = self.connectToDB(cmd)
-        fpsTools.calcBoresight(db, frameIds, pfsVisitId)
+        boresightMeasure.calcBoresight(cmd, db, frameIds, pfsVisitId, writeToDB = writeToDB)
+
+        cmd.finish(f'text="Boresight calculation is finished."')
