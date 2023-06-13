@@ -1306,6 +1306,7 @@ class FpsCmd(object):
                                        allocated_at='now',
                                        converg_num_iter=maxIteration,
                                        converg_elapsed_time=round(time.time() - start, 3),
+                                       converg_tolerance=tolerance,
                                        cmd=cmd)
 
         cmd.inform(f'pfsConfig=0x{designId:016x},{visit},Done')
