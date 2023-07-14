@@ -1,5 +1,8 @@
+from datetime import datetime as datetime
+
 import numpy as np
 import pandas as pd
+import pfs.utils.coordinates.updateTargetPosition as updateTargetPosition
 import pfs.utils.ingestPfsDesign as ingestPfsDesign
 import pfs.utils.pfsConfigUtils as pfsConfigUtils
 from ics.fpsActor.utils.pfsDesign import readDesign
@@ -7,7 +10,7 @@ from opdb import opdb
 from pfs.datamodel import PfsConfig, FiberStatus, TargetType
 from pfs.utils.fiberids import FiberIds
 
-__all__ = ["pfsConfigFromDesign", "makeVanillaPfsConfig", "makeTargetsArray", "updatePfiNominal",
+__all__ = ["pfsConfigFromDesign", "makeVanillaPfsConfig", "makeTargetsArray", "tweakTargetPosition",
            "updatePfiCenter", "writePfsConfig", "ingestPfsConfig"]
 
 
@@ -51,9 +54,24 @@ def makeTargetsArray(pfsConfig):
     return targets[:, 0] + targets[:, 1] * 1j, isNan
 
 
-def updatePfiNominal(pfsConfig, cmd=None):
-    """Just a placeholder for now."""
-    pass
+def tweakTargetPosition(pfsConfig, cmd=None):
+    """Update pfsConfig target position at the time of observation."""
+    radec = np.vstack([pfsConfig.ra, pfsConfig.dec])
+    pa = pfsConfig.posAng
+    cent = np.vstack([pfsConfig.raBoresight, pfsConfig.decBoresight])
+    # setting pm and par to 0 for now.
+    pm = np.zeros(radec.shape)
+    par = np.zeros(radec.shape[1])
+    obstime = datetime.utcnow().isoformat()
+
+    ra_now, dec_now, pfi_now_x, pfi_now_y = updateTargetPosition.update_target_position(radec, pa, cent, pm, par,
+                                                                                        obstime)
+    # setting the new positions.
+    pfsConfig.ra = ra_now
+    pfsConfig.dec = dec_now
+    pfsConfig.pfiNominal = np.vstack((pfi_now_x, pfi_now_y)).transpose()
+
+    return pfsConfig
 
 
 def updatePfiCenter(pfsConfig, calibModel, cmd=None):
