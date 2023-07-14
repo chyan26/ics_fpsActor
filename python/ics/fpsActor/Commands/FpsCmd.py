@@ -1194,8 +1194,9 @@ class FpsCmd(object):
         # making base pfsConfig.
         pfsConfig = pfsConfigUtils.makeVanillaPfsConfig(designId, visit0=visit, maskFile=maskFile)
         cmd.inform(f'pfsConfig=0x{designId:016x},{visit},Preparing')
-        # just a placeholder for now...
-        pfsConfigUtils.updatePfiNominal(pfsConfig)
+        # Last minute tweaking for proper motion / parallax ..
+        cmd.inform(f'text="Tweaking designed targets position..."')
+        pfsConfigUtils.tweakTargetPosition(pfsConfig)
 
         targets, isNan = pfsConfigUtils.makeTargetsArray(pfsConfig)
         # setting NaN targets to centers + (0.5+0.5j)
