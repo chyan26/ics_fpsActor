@@ -179,8 +179,8 @@ class CobraTargetTable(object):
                        'pfi_nominal_y_mm': [],
                        'pfi_target_x_mm': [],
                        'pfi_target_y_mm': [],
-                       'motor_target_theta': [],
-                       'motor_target_phi': [],
+                       #'motor_target_theta': [],
+                       #'motor_target_phi': [],
                        }
 
         for iteration in range(self.tries):
@@ -199,20 +199,20 @@ class CobraTargetTable(object):
                     targetTable['pfi_target_x_mm'].append(self.calibModel.centers[idx].real)
                     targetTable['pfi_target_y_mm'].append(self.calibModel.centers[idx].imag)
 
-                    targetTable['motor_target_theta'].append(0)
-                    targetTable['motor_target_phi'].append(0)
+                    #targetTable['motor_target_theta'].append(0)
+                    #targetTable['motor_target_phi'].append(0)
 
                 else:
                     if iteration < 2:
                         targetTable['pfi_target_x_mm'].append(firstStepMove[goodIdx == idx].real[0])
                         targetTable['pfi_target_y_mm'].append(firstStepMove[goodIdx == idx].imag[0])
-                        targetTable['motor_target_theta'].append(firstThetaAngle[goodIdx == idx][0])
-                        targetTable['motor_target_phi'].append(firstPhiAngle[goodIdx == idx][0])
+                        #targetTable['motor_target_theta'].append(firstThetaAngle[goodIdx == idx][0])
+                        #targetTable['motor_target_phi'].append(firstPhiAngle[goodIdx == idx][0])
                     else:
                         targetTable['pfi_target_x_mm'].append(targetStepMove[goodIdx == idx].real[0])
                         targetTable['pfi_target_y_mm'].append(targetStepMove[goodIdx == idx].imag[0])
-                        targetTable['motor_target_theta'].append(targetThetaAngle[goodIdx == idx][0])
-                        targetTable['motor_target_phi'].append(targetPhiAngle[goodIdx == idx][0])
+                        #targetTable['motor_target_theta'].append(targetThetaAngle[goodIdx == idx][0])
+                        #targetTable['motor_target_phi'].append(targetPhiAngle[goodIdx == idx][0])
 
         self.dataTable = pd.DataFrame(targetTable)
 
