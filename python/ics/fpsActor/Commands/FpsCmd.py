@@ -78,7 +78,7 @@ class FpsCmd(object):
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign',
-             '<designId> [@twoStepsOff] [@goHome] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]',
+             '<designId> [@twoStepsOff] [@goHome] [@noTweak] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]',
              self.moveToPfsDesign),
             ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]',
@@ -1182,6 +1182,7 @@ class FpsCmd(object):
 
         twoSteps = 'twoStepsOff' not in cmdKeys
         goHome = 'goHome' in cmdKeys
+        doTweak = 'noTweak' not in cmdKeys
 
         self.cc.expTime = expTime
         cmd.inform(f'text="Setting moveToPfsDesign expTime={expTime}"')
@@ -1194,9 +1195,11 @@ class FpsCmd(object):
         # making base pfsConfig.
         pfsConfig = pfsConfigUtils.makeVanillaPfsConfig(designId, visit0=visit, maskFile=maskFile)
         cmd.inform(f'pfsConfig=0x{designId:016x},{visit},Preparing')
-        # Last minute tweaking for proper motion / parallax ..
-        cmd.inform(f'text="Tweaking designed targets position..."')
-        pfsConfigUtils.tweakTargetPosition(pfsConfig)
+
+        if doTweak:
+            # Last minute tweaking for proper motion / parallax ..
+            cmd.inform(f'text="Tweaking designed targets position..."')
+            pfsConfigUtils.tweakTargetPosition(pfsConfig)
 
         targets, isNan = pfsConfigUtils.makeTargetsArray(pfsConfig)
         # setting NaN targets to centers + (0.5+0.5j)
