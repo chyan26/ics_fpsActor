@@ -1099,8 +1099,13 @@ class FpsCmd(object):
 
         """
         visit = self.actor.visitor.setOrGetVisit(cmd)
-        eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.01,
-                               tries=12, homed=False, newDir=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
+
+        cmdString = 'moveToPfsDesign designID=0x464fb47d38f6c9f2 goHome noTweak'
+        cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
+                                      forUserCmd=cmd, timout=10)
+
+        #eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.01,
+        #                       tries=12, homed=False, newDir=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
         cmd.finish(f'text="moveToSafePosition is finished"')
 
