@@ -59,9 +59,9 @@ def tweakTargetPosition(pfsConfig, cmd=None):
     radec = np.vstack([pfsConfig.ra, pfsConfig.dec])
     pa = pfsConfig.posAng
     cent = np.vstack([pfsConfig.raBoresight, pfsConfig.decBoresight])
-    # setting pm and par to 0 for now.
-    pm = np.zeros(radec.shape)
-    par = np.zeros(radec.shape[1])
+    # getting pm and par from design.
+    pm = np.vstack([pfsConfig.pmRa, pfsConfig.pmDec])
+    par = pfsConfig.parallax
     obstime = datetime.utcnow().isoformat()
 
     ra_now, dec_now, pfi_now_x, pfi_now_y = updateTargetPosition.update_target_position(radec, pa, cent, pm, par,
