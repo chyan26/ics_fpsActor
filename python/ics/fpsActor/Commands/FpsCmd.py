@@ -1126,7 +1126,7 @@ class FpsCmd(object):
         """
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
-        cmdString = 'moveToPfsDesign designID=0x464fb47d38f6c9f2 goHome noTweak'
+        cmdString = 'moveToPfsDesign designID=0x464fb47d38f6c9f2 tolerance=0.1 iteration=12 goHome noTweak'
         cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
                                       forUserCmd=cmd, timout=10)
 
