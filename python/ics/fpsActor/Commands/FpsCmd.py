@@ -397,11 +397,37 @@ class FpsCmd(object):
 
         cmdKeys = cmd.cmd.keywords
 
-        self._simpleConnect()
+        #Power off the FPGA
+        self.cc.pfi.power(0x23f)
         time.sleep(2)
-
         res = self.cc.pfi.diag()
-        cmd.finish(f'text="diag = {res}"')
+        cmd.inform(f'text="diag = {res}"')
+        
+        # Poweer on the FPGA 
+        self.cc.pfi.power(0x0)
+        time.sleep(1)
+        self.cc.pfi.reset()
+        time.sleep(1)
+        res = self.cc.pfi.diag()
+        cmd.inform(f'text="diag = {res}"')
+
+        butlerResource = butler.Butler()
+        xml = butlerResource.getPath("moduleXml", moduleName="ALL", version="")
+
+        self.logger.info(f'Input XML file = {xml}')
+        self.xml = pathlib.Path(xml)
+
+        mod = 'ALL'
+
+        cmd.inform(f"text='Connecting to %s FPGA'" % ('real' if self.fpgaHost == 'fpga' else 'simulator'))
+        
+        self.cc = cobraCoach.CobraCoach(self.fpgaHost, loadModel=False, actor=self.actor, cmd=cmd)
+
+        self.cc.loadModel(file=pathlib.Path(self.xml))
+        eng.setCobraCoach(self.cc)
+
+        cmd.finish(f"text='FPGA connected with model = {self.xml}'")
+
 
     def ledlight(self, cmd):
         """Turn on/off the fiducial fiber light"""
@@ -431,7 +457,7 @@ class FpsCmd(object):
         try:
             design = self._loadPfsDesign(cmd, designId)
         except Exception as e:
-            cmd.fail(f'text="Failed to load pfsDesign for pfsSDesignId={designId}: {e}"')
+            cmd.fail(f'text="Failed to load pfsDesign for pfsDesignId={designId}: {e}"')
             return
 
         fpsState.fpsState.setDesign(designId, design)
