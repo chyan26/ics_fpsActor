@@ -80,7 +80,7 @@ class FpsCmd(object):
             ('moveToPfsDesign',
              '<designId> [@twoStepsOff] [@goHome] [@noTweak] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]',
              self.moveToPfsDesign),
-            ('moveToSafePosition', '[<visit>]', self.moveToSafePosition),
+            ('moveToSafePosition', '[<expTime>] [<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]',
              self.makeMotorMap),
             ('makeMotorMapGroups', '@(phi|theta) <stepsize> <repeat> [@slowMap] [@fastMap] [<cobraGroup>] [<visit>]',
@@ -1124,12 +1124,18 @@ class FpsCmd(object):
         Assumes phi is at 60deg and that we know thetaPositions.
 
         """
+        cmdKeys = cmd.cmd.keywords
         visit = self.actor.visitor.setOrGetVisit(cmd)
+        expTime = cmdKeys['expTime'].values[0] if 'expTime' in cmdKeys else None
+        if expTime is None:
+            cmdString = 'moveToPfsDesign designID=0x464fb47d38f6c9f2 tolerance=0.1 iteration=12 goHome noTweak'
+        else:
+            cmdString = f'moveToPfsDesign designID=0x464fb47d38f6c9f2 expTime={expTime} tolerance=0.1 iteration=12 goHome noTweak'
 
-        cmdString = 'moveToPfsDesign designID=0x464fb47d38f6c9f2 tolerance=0.1 iteration=12 goHome noTweak'
-        cmdVar = self.actor.cmdr.call(actor='mcs', cmdStr=cmdString,
-                                      forUserCmd=cmd, timout=10)
-
+        cmdVar = self.actor.cmdr.call(actor='fps', cmdStr=cmdString,
+                                      forUserCmd=cmd, timeLim=300)
+        if cmdVar.didFail:
+            raise RuntimeError("move to safe position failed")
         #eng.moveToSafePosition(self.cc.goodIdx, tolerance=0.01,
         #                       tries=12, homed=False, newDir=False, threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
@@ -1304,11 +1310,16 @@ class FpsCmd(object):
 
             _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
+            
+            cmd.inform(f'text="Using 0.8 second exposure time for first two iteration."')
+            self.cc.expTime = 0.8
             dataPath, atThetas, atPhis, moves[0, :, :2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, relative=False, local=True, tolerance=tolerance,
                                  tries=2, homed=goHome, newDir=True, thetaFast=True, phiFast=True,
                                  threshold=2.0, thetaMargin=np.deg2rad(15.0))
 
+
+            self.cc.expTime = expTime
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = _useScaling, _maxSegments, _maxTotalSteps
             dataPath, atThetas, atPhis, moves[0, :, 2:] = \
                 eng.moveThetaPhi(cIds, thetas, phis, relative=False, local=True, tolerance=tolerance,
