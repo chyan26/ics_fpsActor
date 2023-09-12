@@ -1263,7 +1263,8 @@ class FpsCmd(object):
         self.cc.trajectoryMode = True
         traj, moves = eng.createTrajectory(goodIdx, thetas, phis,
                                            tries=iteration, twoSteps=True, threshold=2.0, timeStep=500)
-
+        moves[:,2]['position'] = targets
+        
         cmd.inform(f'text="Reset the current angles for cobra arms."')
         self.cc.trajectoryMode = False
         thetaHome = ((self.cc.calibModel.tht1 - self.cc.calibModel.tht0 + np.pi) % (np.pi * 2) + np.pi)
