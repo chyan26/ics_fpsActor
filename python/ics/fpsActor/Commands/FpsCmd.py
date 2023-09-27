@@ -23,9 +23,9 @@ from ics.fpsActor import najaVenator
 from ics.fpsActor.utils import display as vis
 from opdb import opdb
 from pfs.utils import butler
-from procedures.moduleTest import calculation
-from procedures.moduleTest import cobraCoach
-from procedures.moduleTest import engineer as eng
+from ics.cobraCharmer.cobraCoach import calculation
+from ics.cobraCharmer.cobraCoach  import cobraCoach
+from ics.cobraCharmer.cobraCoach  import engineer as eng
 
 reload(vis)
 
