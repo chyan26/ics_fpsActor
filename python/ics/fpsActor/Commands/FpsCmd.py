@@ -78,7 +78,7 @@ class FpsCmd(object):
             ('setCobraMode', '@(phi|theta|normal)', self.setCobraMode),
             ('setGeometry', '@(phi|theta) <runDir>', self.setGeometry),
             ('moveToPfsDesign',
-             '<designId> [@twoStepsOff] [@goHome] [@noTweak] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]',
+             '<designId> [@twoStepsOff] [@shortExpOff] [@goHome] [@noTweak] [<visit>] [<expTime>] [<iteration>] [<tolerance>] [<maskFile>]',
              self.moveToPfsDesign),
             ('moveToSafePosition', '[<expTime>] [<visit>]', self.moveToSafePosition),
             ('makeMotorMap', '@(phi|theta) <stepsize> <repeat> [<totalsteps>] [@slowOnly] [@forceMove] [<visit>]',
@@ -1217,6 +1217,7 @@ class FpsCmd(object):
         iteration = cmdKeys['iteration'].values[0] if 'iteration' in cmdKeys else 12
         tolerance = cmdKeys['tolerance'].values[0] if 'tolerance' in cmdKeys else 0.01
 
+        shortExp = 'shortExpOff' not in cmdKeys
         twoSteps = 'twoStepsOff' not in cmdKeys
         goHome = 'goHome' in cmdKeys
         doTweak = 'noTweak' not in cmdKeys
@@ -1312,8 +1313,13 @@ class FpsCmd(object):
             _useScaling, _maxSegments, _maxTotalSteps = self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps
             self.cc.useScaling, self.cc.maxSegments, self.cc.maxTotalSteps = False, _maxSegments * 2, _maxTotalSteps * 2
             
-            cmd.inform(f'text="Using 0.8 second exposure time for first two iteration."')
-            self.cc.expTime = 0.8
+            if shortExp is True:
+                cmd.inform(f'text="Using 0.8 second exposure time for first three iteration."')
+                self.cc.expTime = 0.8
+            else:
+                cmd.inform(f'text="Using {expTime} second exposure time for first three iteration."')
+                self.cc.expTime = expTime
+
             dataPath, atThetas, atPhis, moves[0, :, :2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, relative=False, local=True, tolerance=tolerance,
                                  tries=2, homed=goHome, newDir=True, thetaFast=True, phiFast=True,
