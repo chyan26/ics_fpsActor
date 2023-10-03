@@ -1320,6 +1320,7 @@ class FpsCmd(object):
                 cmd.inform(f'text="Using {expTime} second exposure time for first three iteration."')
                 self.cc.expTime = expTime
 
+            cmd.inform(f'text="Cobra goHome is set to be {goHome}"')
             dataPath, atThetas, atPhis, moves[0, :, :2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, relative=False, local=True, tolerance=tolerance,
                                  tries=2, homed=goHome, newDir=True, thetaFast=True, phiFast=True,
