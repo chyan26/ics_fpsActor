@@ -5,6 +5,7 @@ import pandas as pd
 import pfs.utils.pfsDesignUtils as pfsDesignUtils
 from pfs.datamodel import TargetType, PfsDesign
 from pfs.utils.fiberids import FiberIds
+from pfs.utils.pfsDesignUtils import fakeRa, fakeDec
 
 pfsDesignDir = '/data/pfsDesign'
 
@@ -53,8 +54,8 @@ def createHomeDesign(calibModel, goodIdx, maskFile):
 
     # faking ra and dec.
     pfiNominal = sgfm.sort_values('fiberId')[['x', 'y']].to_numpy()
-    ra = 100 + 1e-3 * pfiNominal[:, 0]
-    dec = 100 + 1e-3 * pfiNominal[:, 1]
+    ra = fakeRa + 1e-3 * pfiNominal[:, 0]
+    dec = fakeDec + 1e-3 * pfiNominal[:, 1]
 
     # setting designName.
     designName = makeDesignName('cobraHome', maskFile)
@@ -84,8 +85,8 @@ def createBlackDotDesign(dots, goodIdx, maskFile):
 
     # faking ra and dec.
     pfiNominal = sgfm.sort_values('fiberId')[['x', 'y']].to_numpy()
-    ra = 100 + 1e-3 * pfiNominal[:, 0]
-    dec = 100 + 1e-3 * pfiNominal[:, 1]
+    ra = fakeRa + 1e-3 * pfiNominal[:, 0]
+    dec = fakeDec + 1e-3 * pfiNominal[:, 1]
 
     # setting designName.
     designName = makeDesignName('blackDots', maskFile)
