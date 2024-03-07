@@ -3,11 +3,12 @@ import os
 import numpy as np
 import pandas as pd
 import pfs.utils.pfsDesignUtils as pfsDesignUtils
-from pfs.datamodel import TargetType, PfsDesign
+from pfs.datamodel import TargetType, PfsDesign, FiberStatus
 from pfs.utils.fiberids import FiberIds
 from pfs.utils.pfsDesignUtils import fakeRa, fakeDec
 
 pfsDesignDir = '/data/pfsDesign'
+from pfs.utils import butler
 
 
 def makeDesignName(flavour, maskFile):
@@ -57,17 +58,26 @@ def createHomeDesign(calibModel, goodIdx, maskFile):
     ra = fakeRa + 1e-3 * pfiNominal[:, 0]
     dec = fakeDec + 1e-3 * pfiNominal[:, 1]
 
+    # Set fiberStatus.
+    sgfm['fiberStatus'] = FiberStatus.GOOD
+    FIBER_BROKEN_MASK = (calibModel.status & calibModel.FIBER_BROKEN_MASK).astype('bool')
+    sgfm.loc[FIBER_BROKEN_MASK, 'fiberStatus'] = FiberStatus.BROKENFIBER
+    fiberStatus = sgfm.sort_values('fiberId')['fiberStatus'].to_numpy()
+
     # setting designName.
     designName = makeDesignName('cobraHome', maskFile)
 
     pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
-                                             arms='brn', designName=designName)
+                                             fiberStatus=fiberStatus, arms='brn', designName=designName)
 
     return pfsDesign
 
 
-def createBlackDotDesign(dots, goodIdx, maskFile):
+def createBlackDotDesign(calibModel, goodIdx, maskFile):
     """Create blac dots design from current dots position, ra and dec are faked."""
+    nestor = butler.Butler()
+    dots = nestor.get('black_dots')
+
     gfm = pd.DataFrame(FiberIds().data)
     sgfm = gfm.set_index('scienceFiberId').loc[np.arange(2394) + 1].reset_index().sort_values('cobraId')
     sgfm['x'] = dots.x.to_numpy()
@@ -88,11 +98,17 @@ def createBlackDotDesign(dots, goodIdx, maskFile):
     ra = fakeRa + 1e-3 * pfiNominal[:, 0]
     dec = fakeDec + 1e-3 * pfiNominal[:, 1]
 
+    # Set fiberStatus.
+    sgfm['fiberStatus'] = FiberStatus.GOOD
+    FIBER_BROKEN_MASK = (calibModel.status & calibModel.FIBER_BROKEN_MASK).astype('bool')
+    sgfm.loc[FIBER_BROKEN_MASK, 'fiberStatus'] = FiberStatus.BROKENFIBER
+    fiberStatus = sgfm.sort_values('fiberId')['fiberStatus'].to_numpy()
+
     # setting designName.
     designName = makeDesignName('blackDots', maskFile)
 
     pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
-                                             arms='brn', designName=designName)
+                                             fiberStatus=fiberStatus, arms='brn', designName=designName)
 
     return pfsDesign
 
