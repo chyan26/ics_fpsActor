@@ -763,10 +763,7 @@ class FpsCmd(object):
         maskFile = cmdKeys['maskFile'].values[0] if 'maskFile' in cmdKeys else None
         goodIdx = self.loadGoodIdx(maskFile)
 
-        nestor = butler.Butler()
-        dots = nestor.get('black_dots')
-
-        pfsDesign = pfsDesignUtils.createBlackDotDesign(dots, goodIdx, maskFile)
+        pfsDesign = pfsDesignUtils.createBlackDotDesign(self.cc.calibModel, goodIdx, maskFile)
 
         doWrite, fullPath = pfsDesignUtils.writeDesign(pfsDesign)
         if doWrite:
