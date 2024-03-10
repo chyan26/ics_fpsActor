@@ -1276,7 +1276,7 @@ class FpsCmd(object):
 
         targetTable = traj.calculateFiberPositions(self.cc)
 
-        cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel)
+        cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel, designId)
         cobraTargetTable.makeTargetTable(moves, self.cc, goodIdx)
         cobraTargetTable.writeTargetTable()
 
