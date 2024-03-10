@@ -149,19 +149,20 @@ class NajaVenator(object):
 
 
 class CobraTargetTable(object):
-    def __init__(self, visitid, tries, calibModel):
+    def __init__(self, visitid, tries, calibModel, designID):
         self._dbConn = opdb.OpDB(hostname='db-ics', dbname='opdb', username='pfs')
         self.visitid = visitid
         self.tries = tries
+        self.designID = designID
 
-        self.interation = 1
+        self.iteration = 1
         self.calibModel = calibModel
 
     def makeTargetTable(self, moves, cobraCoach, goodIdx):
         """Make the target table for the convergence move."""
         cc = cobraCoach
 
-        pfs_config_id = 0
+        pfs_config_id = self.designID
 
         firstStepMove = moves['position'][:, 0]
         firstThetaAngle = moves['thetaAngle'][:, 0]
@@ -179,6 +180,7 @@ class CobraTargetTable(object):
                        'pfi_nominal_y_mm': [],
                        'pfi_target_x_mm': [],
                        'pfi_target_y_mm': [],
+                       'flags':[]
                        #'motor_target_theta': [],
                        #'motor_target_phi': [],
                        }
@@ -189,10 +191,11 @@ class CobraTargetTable(object):
                 targetTable['pfs_config_id'].append(pfs_config_id)
 
                 targetTable['cobra_id'].append(idx + 1)
-                targetTable['iteration'].append(iteration + 1)
+                targetTable['iteration'].append(iteration)
 
                 targetTable['pfi_nominal_x_mm'].append(self.calibModel.centers[idx].real)
                 targetTable['pfi_nominal_y_mm'].append(self.calibModel.centers[idx].imag)
+                targetTable['flags'].append(0)
 
                 if idx in cc.badIdx or idx not in goodIdx:
                     # Using cobra center for bad cobra targets
