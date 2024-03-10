@@ -149,13 +149,18 @@ class NajaVenator(object):
 
 
 class CobraTargetTable(object):
-    def __init__(self, visitid, tries, calibModel, designID):
+    def __init__(self, visitid, tries, calibModel, designID, goHome = False):
         self._dbConn = opdb.OpDB(hostname='db-ics', dbname='opdb', username='pfs')
         self.visitid = visitid
         self.tries = tries
         self.designID = designID
+        self.goHome = goHome
+        
+        if self.goHome is True:
+            self.iteration = tries+1     
+        else:
+            self.iteration = tries
 
-        self.iteration = 1
         self.calibModel = calibModel
 
     def makeTargetTable(self, moves, cobraCoach, goodIdx):
@@ -185,7 +190,7 @@ class CobraTargetTable(object):
                        #'motor_target_phi': [],
                        }
 
-        for iteration in range(self.tries):
+        for iteration in range(self.iteration):
             for idx in range(cc.nCobras):
                 targetTable['pfs_visit_id'].append(self.visitid)
                 targetTable['pfs_config_id'].append(pfs_config_id)
@@ -206,16 +211,28 @@ class CobraTargetTable(object):
                     #targetTable['motor_target_phi'].append(0)
 
                 else:
-                    if iteration < 2:
-                        targetTable['pfi_target_x_mm'].append(firstStepMove[goodIdx == idx].real[0])
-                        targetTable['pfi_target_y_mm'].append(firstStepMove[goodIdx == idx].imag[0])
-                        #targetTable['motor_target_theta'].append(firstThetaAngle[goodIdx == idx][0])
-                        #targetTable['motor_target_phi'].append(firstPhiAngle[goodIdx == idx][0])
+                    if self.goHome is True:
+                        if iteration == 0:
+                            targetTable['pfi_target_x_mm'].append(self.calibModel.centers[idx].real)
+                            targetTable['pfi_target_y_mm'].append(self.calibModel.centers[idx].imag)
+                        elif iteration == 1 or iteration == 2:
+                            targetTable['pfi_target_x_mm'].append(firstStepMove[goodIdx == idx].real[0])
+                            targetTable['pfi_target_y_mm'].append(firstStepMove[goodIdx == idx].imag[0])
+                        else:
+                            targetTable['pfi_target_x_mm'].append(targetStepMove[goodIdx == idx].real[0])
+                            targetTable['pfi_target_y_mm'].append(targetStepMove[goodIdx == idx].imag[0])
                     else:
-                        targetTable['pfi_target_x_mm'].append(targetStepMove[goodIdx == idx].real[0])
-                        targetTable['pfi_target_y_mm'].append(targetStepMove[goodIdx == idx].imag[0])
-                        #targetTable['motor_target_theta'].append(targetThetaAngle[goodIdx == idx][0])
-                        #targetTable['motor_target_phi'].append(targetPhiAngle[goodIdx == idx][0])
+                    
+                        if iteration < 2:
+                            targetTable['pfi_target_x_mm'].append(firstStepMove[goodIdx == idx].real[0])
+                            targetTable['pfi_target_y_mm'].append(firstStepMove[goodIdx == idx].imag[0])
+                            #targetTable['motor_target_theta'].append(firstThetaAngle[goodIdx == idx][0])
+                            #targetTable['motor_target_phi'].append(firstPhiAngle[goodIdx == idx][0])
+                        else:
+                            targetTable['pfi_target_x_mm'].append(targetStepMove[goodIdx == idx].real[0])
+                            targetTable['pfi_target_y_mm'].append(targetStepMove[goodIdx == idx].imag[0])
+                            #targetTable['motor_target_theta'].append(targetThetaAngle[goodIdx == idx][0])
+                            #targetTable['motor_target_phi'].append(targetPhiAngle[goodIdx == idx][0])
 
         self.dataTable = pd.DataFrame(targetTable)
 

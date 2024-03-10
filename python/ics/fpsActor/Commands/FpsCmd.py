@@ -1267,16 +1267,22 @@ class FpsCmd(object):
         self.cc.trajectoryMode = False
         thetaHome = ((self.cc.calibModel.tht1 - self.cc.calibModel.tht0 + np.pi) % (np.pi * 2) + np.pi)
 
+
         if goHome:
             cmd.inform(f'text="Setting ThetaAngle = Home and phiAngle = 0."')
             self.cc.setCurrentAngles(self.cc.allCobras, thetaAngles=thetaHome, phiAngles=0)
+
+            cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel, designId, goHome=True)
+
         else:
             cmd.inform(f'text="Setting ThetaAngle = {self.atThetas} and phiAngle = {self.atPhis}."')
             self.cc.setCurrentAngles(self.cc.allCobras[goodIdx], thetaAngles=self.atThetas, phiAngles=self.atPhis)
 
-        targetTable = traj.calculateFiberPositions(self.cc)
+            cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel, designId, goHome=False)
 
-        cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel, designId)
+
+        #targetTable = traj.calculateFiberPositions(self.cc)
+
         cobraTargetTable.makeTargetTable(moves, self.cc, goodIdx)
         cobraTargetTable.writeTargetTable()
 
