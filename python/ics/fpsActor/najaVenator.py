@@ -154,7 +154,7 @@ class CobraTargetTable(object):
         self.visitid = visitid
         self.tries = tries
 
-        self.interation = 1
+        self.iteration = 1
         self.calibModel = calibModel
 
     def makeTargetTable(self, moves, cobraCoach, goodIdx):
@@ -179,6 +179,7 @@ class CobraTargetTable(object):
                        'pfi_nominal_y_mm': [],
                        'pfi_target_x_mm': [],
                        'pfi_target_y_mm': [],
+                       'flags':[]
                        #'motor_target_theta': [],
                        #'motor_target_phi': [],
                        }
@@ -189,10 +190,11 @@ class CobraTargetTable(object):
                 targetTable['pfs_config_id'].append(pfs_config_id)
 
                 targetTable['cobra_id'].append(idx + 1)
-                targetTable['iteration'].append(iteration + 1)
+                targetTable['iteration'].append(iteration)
 
                 targetTable['pfi_nominal_x_mm'].append(self.calibModel.centers[idx].real)
                 targetTable['pfi_nominal_y_mm'].append(self.calibModel.centers[idx].imag)
+                targetTable['flags'].append(np.zeros(len(self.calibModel.centers[idx])))
 
                 if idx in cc.badIdx or idx not in goodIdx:
                     # Using cobra center for bad cobra targets
