@@ -1,7 +1,7 @@
 import numpy as np
 import astropy.io.fits as pyfits
 
-from scipy.stats import sigmaclip
+#from scipy.stats import sigmaclip
 import numpy.ma as ma
 from scipy import optimize
 import math
