@@ -5,6 +5,7 @@ import pandas as pd
 import pfs.utils.coordinates.updateTargetPosition as updateTargetPosition
 import pfs.utils.ingestPfsDesign as ingestPfsDesign
 import pfs.utils.pfsConfigUtils as pfsConfigUtils
+import pfs.utils.pfsDesignUtils as pfsDesignUtils
 from ics.fpsActor.utils.pfsDesign import readDesign
 from opdb import opdb
 from pfs.datamodel import PfsConfig, FiberStatus, TargetType
@@ -112,12 +113,13 @@ def updatePfiCenter(pfsConfig, calibModel, cmd=None):
     pfiCenter[fiberIndex, 0] = lastIteration.pfi_center_x_mm.to_numpy()
     pfiCenter[fiberIndex, 1] = lastIteration.pfi_center_y_mm.to_numpy()
     pfsConfig.pfiCenter = pfiCenter
-    # Set fiberStatus.
-    FIBER_BROKEN_MASK = (calibModel.status & calibModel.FIBER_BROKEN_MASK).astype('bool')
-    COBRA_OK_MASK = (calibModel.status & calibModel.COBRA_OK_MASK).astype('bool')
-    lastIteration['fiberStatus'] = FiberStatus.GOOD
-    lastIteration.loc[FIBER_BROKEN_MASK, 'fiberStatus'] = FiberStatus.BROKENFIBER
-    lastIteration.loc[COBRA_OK_MASK & noMatch, 'fiberStatus'] = FiberStatus.BLACKSPOT
+
+    # Set BROKENFIBER, BROKENCOBRA, BLOCKED fiberStatus.
+    pfsConfig = pfsDesignUtils.setFiberStatus(pfsConfig, calibModel=calibModel)
+    # Set BLACKDOT fiberStatus.
+    lastIteration['fiberStatus'] = pfsConfig.fiberStatus[fiberIndex]
+    FIBER_GOOD_MASK = lastIteration.fiberStatus.to_numpy() == FiberStatus.GOOD
+    lastIteration.loc[FIBER_GOOD_MASK & noMatch, 'fiberStatus'] = FiberStatus.BLACKSPOT
     pfsConfig.fiberStatus[fiberIndex] = lastIteration.fiberStatus.to_numpy()
 
     if cmd:
