@@ -3,9 +3,9 @@ import os
 import numpy as np
 import pandas as pd
 import pfs.utils.pfsDesignUtils as pfsDesignUtils
-from pfs.datamodel import TargetType, PfsDesign, FiberStatus
+from pfs.datamodel import TargetType, PfsDesign
 from pfs.utils.fiberids import FiberIds
-from pfs.utils.pfsDesignUtils import fakeRa, fakeDec, fakeRaDecFromPfiNominal
+from pfs.utils.pfsDesignUtils import fakeRaDecFromPfiNominal
 
 pfsDesignDir = '/data/pfsDesign'
 from pfs.utils import butler
@@ -57,17 +57,13 @@ def createHomeDesign(calibModel, goodIdx, maskFile):
     pfiNominal = sgfm.sort_values('fiberId')[['x', 'y']].to_numpy()
     ra, dec = fakeRaDecFromPfiNominal(pfiNominal)
 
-    # Set fiberStatus.
-    sgfm['fiberStatus'] = FiberStatus.GOOD
-    FIBER_BROKEN_MASK = (calibModel.status & calibModel.FIBER_BROKEN_MASK).astype('bool')
-    sgfm.loc[FIBER_BROKEN_MASK, 'fiberStatus'] = FiberStatus.BROKENFIBER
-    fiberStatus = sgfm.sort_values('fiberId')['fiberStatus'].to_numpy()
-
     # setting designName.
     designName = makeDesignName('cobraHome', maskFile)
 
     pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
-                                             fiberStatus=fiberStatus, arms='brn', designName=designName)
+                                             arms='brn', designName=designName)
+    # Set BROKENFIBER, BROKENCOBRA, BLOCKED fiberStatus.
+    pfsDesign = pfsDesignUtils.setFiberStatus(pfsDesign, calibModel=calibModel)
 
     return pfsDesign
 
@@ -96,17 +92,13 @@ def createBlackDotDesign(calibModel, goodIdx, maskFile):
     pfiNominal = sgfm.sort_values('fiberId')[['x', 'y']].to_numpy()
     ra, dec = fakeRaDecFromPfiNominal(pfiNominal)
 
-    # Set fiberStatus.
-    sgfm['fiberStatus'] = FiberStatus.GOOD
-    FIBER_BROKEN_MASK = (calibModel.status & calibModel.FIBER_BROKEN_MASK).astype('bool')
-    sgfm.loc[FIBER_BROKEN_MASK, 'fiberStatus'] = FiberStatus.BROKENFIBER
-    fiberStatus = sgfm.sort_values('fiberId')['fiberStatus'].to_numpy()
-
     # setting designName.
     designName = makeDesignName('blackDots', maskFile)
 
     pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
-                                             fiberStatus=fiberStatus, arms='brn', designName=designName)
+                                             arms='brn', designName=designName)
+    # Set BROKENFIBER, BROKENCOBRA, BLOCKED fiberStatus.
+    pfsDesign = pfsDesignUtils.setFiberStatus(pfsDesign, calibModel=calibModel)
 
     return pfsDesign
 
