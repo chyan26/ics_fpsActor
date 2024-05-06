@@ -1214,6 +1214,8 @@ class FpsCmd(object):
 
     def moveToPfsDesign(self, cmd):
         """ Move cobras to a PFS design. """
+        thetaMarginDeg = 5.0
+        
         start = time.time()
         cmdKeys = cmd.cmd.keywords
 
@@ -1336,7 +1338,7 @@ class FpsCmd(object):
             dataPath, atThetas, atPhis, moves[0, :, :2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, relative=False, local=True, tolerance=tolerance,
                                  tries=2, homed=goHome, newDir=True, thetaFast=True, phiFast=True,
-                                 threshold=2.0, thetaMargin=np.deg2rad(5.0))
+                                 threshold=2.0, thetaMargin=np.deg2rad(thetaMarginDeg))
 
 
             self.cc.expTime = expTime
@@ -1346,7 +1348,7 @@ class FpsCmd(object):
                                  tries=iteration - 2,
                                  homed=False,
                                  newDir=False, thetaFast=False, phiFast=True, threshold=2.0,
-                                 thetaMargin=np.deg2rad(5.0))
+                                 thetaMargin=np.deg2rad(thetaMarginDeg))
         else:
             cIds = goodIdx
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(cIds, thetas,
@@ -1354,7 +1356,7 @@ class FpsCmd(object):
                                                                  tries=iteration, homed=goHome,
                                                                  newDir=True, thetaFast=False, phiFast=False,
                                                                  threshold=2.0,
-                                                                 thetaMargin=np.deg2rad(5.0))
+                                                                 thetaMargin=np.deg2rad(thetaMarginDeg))
         self.atThetas = atThetas
         self.atPhis = atPhis
 
@@ -1376,7 +1378,7 @@ class FpsCmd(object):
                                        cmd=cmd)
 
         cmd.inform(f'pfsConfig=0x{designId:016x},{visit},Done')
-        cmd.finish('text="We are at design position. Do the work punk!"')
+        cmd.finish(f'text="We are at design position in {round(time.time() - start, 3)} seconds."')
 
     def loadDotScales(self, cmd):
         """Load step scaling just for the dot traversal loop. """
