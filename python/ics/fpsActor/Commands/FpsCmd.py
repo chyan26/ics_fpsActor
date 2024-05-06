@@ -1336,7 +1336,7 @@ class FpsCmd(object):
             dataPath, atThetas, atPhis, moves[0, :, :2] = \
                 eng.moveThetaPhi(cIds, thetasVia, phisVia, relative=False, local=True, tolerance=tolerance,
                                  tries=2, homed=goHome, newDir=True, thetaFast=True, phiFast=True,
-                                 threshold=2.0, thetaMargin=np.deg2rad(15.0))
+                                 threshold=2.0, thetaMargin=np.deg2rad(5.0))
 
 
             self.cc.expTime = expTime
@@ -1346,7 +1346,7 @@ class FpsCmd(object):
                                  tries=iteration - 2,
                                  homed=False,
                                  newDir=False, thetaFast=False, phiFast=True, threshold=2.0,
-                                 thetaMargin=np.deg2rad(15.0))
+                                 thetaMargin=np.deg2rad(5.0))
         else:
             cIds = goodIdx
             dataPath, atThetas, atPhis, moves = eng.moveThetaPhi(cIds, thetas,
@@ -1354,7 +1354,7 @@ class FpsCmd(object):
                                                                  tries=iteration, homed=goHome,
                                                                  newDir=True, thetaFast=False, phiFast=False,
                                                                  threshold=2.0,
-                                                                 thetaMargin=np.deg2rad(15.0))
+                                                                 thetaMargin=np.deg2rad(5.0))
         self.atThetas = atThetas
         self.atPhis = atPhis
 
