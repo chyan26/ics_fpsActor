@@ -1365,6 +1365,7 @@ class FpsCmd(object):
 
         # update pfiCenter.
         maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, self.cc.calibModel, cmd=cmd)
+        cmd.inform(f'text="maxIteration from cobra_match : {int(maxIteration)}"')
 
         # write pfsConfig to disk.
         pfsConfigUtils.writePfsConfig(pfsConfig, cmd=cmd)
@@ -1372,7 +1373,7 @@ class FpsCmd(object):
         # insert into opdb.
         pfsConfigUtils.ingestPfsConfig(pfsConfig,
                                        allocated_at='now',
-                                       converg_num_iter=maxIteration,
+                                       converg_num_iter=iteration,
                                        converg_elapsed_time=round(time.time() - start, 3),
                                        converg_tolerance=tolerance,
                                        cmd=cmd)
