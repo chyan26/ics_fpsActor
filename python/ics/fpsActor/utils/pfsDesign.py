@@ -61,7 +61,7 @@ def createHomeDesign(calibModel, goodIdx, maskFile):
     designName = makeDesignName('cobraHome', maskFile)
 
     pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
-                                             arms='brn', designName=designName)
+                                             arms='brnm', designName=designName)
     # Set BROKENFIBER, BROKENCOBRA, BLOCKED fiberStatus.
     pfsDesign = pfsDesignUtils.setFiberStatus(pfsDesign, calibModel=calibModel)
 
@@ -96,7 +96,7 @@ def createBlackDotDesign(calibModel, goodIdx, maskFile):
     designName = makeDesignName('blackDots', maskFile)
 
     pfsDesign = pfsDesignUtils.makePfsDesign(pfiNominal=pfiNominal, ra=ra, dec=dec, targetType=targetType,
-                                             arms='brn', designName=designName)
+                                             arms='brnm', designName=designName)
     # Set BROKENFIBER, BROKENCOBRA, BLOCKED fiberStatus.
     pfsDesign = pfsDesignUtils.setFiberStatus(pfsDesign, calibModel=calibModel)
 
