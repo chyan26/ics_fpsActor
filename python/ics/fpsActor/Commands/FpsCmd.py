@@ -1286,6 +1286,7 @@ class FpsCmd(object):
             cobraTargetTable = najaVenator.CobraTargetTable(visit, iteration, self.cc.calibModel, designId, goHome=True)
 
         else:
+            cmd.inform(f'text="Number of cobras = {len(goodIdx)} Number of angles = {len(self.atThetas[goodIdx])}."')
             cmd.inform(f'text="Setting ThetaAngle = {self.atThetas[goodIdx]} and phiAngle = {self.atPhis[goodIdx]}."')
             self.cc.setCurrentAngles(self.cc.allCobras[goodIdx], 
                                      thetaAngles=self.atThetas[goodIdx], phiAngles=self.atPhis[goodIdx])
