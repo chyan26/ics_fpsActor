@@ -1300,6 +1300,7 @@ class FpsCmd(object):
         cobraTargetTable.writeTargetTable()
 
         # Saving information for book keeping.
+        cmd.inform(f'text="Saving a list of targets to numpy file."')
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
 
