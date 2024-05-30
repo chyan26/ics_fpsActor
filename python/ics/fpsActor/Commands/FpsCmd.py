@@ -1298,6 +1298,7 @@ class FpsCmd(object):
 
         cobraTargetTable.makeTargetTable(moves, self.cc, goodIdx)
         cobraTargetTable.writeTargetTable()
+        
         # Saving information for book keeping.
         np.save(dataPath / 'targets', targets)
         np.save(dataPath / 'moves', moves)
