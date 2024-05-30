@@ -1298,6 +1298,9 @@ class FpsCmd(object):
 
         cobraTargetTable.makeTargetTable(moves, self.cc, goodIdx)
         cobraTargetTable.writeTargetTable()
+        # Saving information for book keeping.
+        np.save(dataPath / 'targets', targets)
+        np.save(dataPath / 'moves', moves)
 
         # adjust theta angles that is too closed to the CCW hard stops
         thetaMarginCCW = 0.1
@@ -1361,9 +1364,6 @@ class FpsCmd(object):
                                                                  thetaMargin=np.deg2rad(thetaMarginDeg))
         self.atThetas = atThetas
         self.atPhis = atPhis
-
-        np.save(dataPath / 'targets', targets)
-        np.save(dataPath / 'moves', moves)
 
         # update pfiCenter.
         maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, self.cc.calibModel, cmd=cmd)
