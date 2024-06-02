@@ -584,14 +584,14 @@ class FpsCmd(object):
         angles = cmd.cmd.keywords['angle'].values[0]
 
         if phi:
-            phiMoveAngle = np.deg2rad(np.full(2394, angles))
-            thetaMoveAngle = np.zeros(2394)
+            phiMoveAngle = np.deg2rad(np.full(2394, angles))[goodIdx]
+            thetaMoveAngle = None
         else:
-            phiMoveAngle = np.zeros(2394)
-            thetaMoveAngle = np.deg2rad(np.full(2394, angles))
+            phiMoveAngle = None
+            thetaMoveAngle = np.deg2rad(np.full(2394, angles))[goodIdx]
 
-        self.cc.moveDeltaAngles(cobras, thetaMoveAngle[goodIdx],
-                                phiMoveAngle[goodIdx], thetaFast=False, phiFast=False)
+        self.cc.moveDeltaAngles(cobras, thetaMoveAngle,
+                                phiMoveAngle, thetaFast=False, phiFast=False)
 
         cmd.finish('text="cobraMoveAngles completed"')
 
