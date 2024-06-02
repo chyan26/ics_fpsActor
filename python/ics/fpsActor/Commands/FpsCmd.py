@@ -820,8 +820,6 @@ class FpsCmd(object):
         self.cc.expTime = expTime
         cmd.inform(f'text="Setting moveToHome expTime={expTime}, noMCSexposure={noMCSexposure}"')
 
-        visit = self.actor.visitor.setOrGetVisit(cmd)
-
         # create or load design.
         if designId:
             pfsDesign = pfsDesignUtils.readDesign(designId)
@@ -834,14 +832,15 @@ class FpsCmd(object):
 
         goodCobra = self.cc.allCobras[goodIdx]
 
-        # making base pfsConfig.
-        pfsConfig = pfsConfigUtils.pfsConfigFromDesign(pfsDesign, visit0=visit)
-        cmd.inform(f'pfsConfig=0x{pfsDesign.pfsDesignId:016x},{visit},inProgress')
+        # Only grab a visit if we need one for the PFSC and pfsConfig files
+        if not noMCSexposure:
+            visit = self.actor.visitor.setOrGetVisit(cmd)
+
         start = time.time()
 
         if phi:
             eng.setPhiMode()
-            self.cc.moveToHome(goodCobra, phiEnable=True, 
+            self.cc.moveToHome(goodCobra, phiEnable=True,
                                noMCS=noMCSexposure)
 
         if theta:
@@ -857,23 +856,24 @@ class FpsCmd(object):
                 diff = self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, thetaCCW=False)
                 self.logger.info(f'Averaged position offset compared with cobra center = {np.mean(diff)}')
 
-        # update pfiCenter.
-        if noMCSexposure:
-            maxIteration = 0
-            pfsConfig.pfiCenter[:] = np.NaN  # we don't know where we are.
-        else:
+        # Only generate pfsConfigs if we take an image which needs them.
+        if not noMCSexposure:
+            # making base pfsConfig.
+            pfsConfig = pfsConfigUtils.pfsConfigFromDesign(pfsDesign, visit0=visit)
+            cmd.inform(f'pfsConfig=0x{pfsDesign.pfsDesignId:016x},{visit},inProgress')
+
             maxIteration = pfsConfigUtils.updatePfiCenter(pfsConfig, self.cc.calibModel, cmd=cmd)
 
-        # write pfsConfig to disk.
-        pfsConfigUtils.writePfsConfig(pfsConfig, cmd=cmd)
-        # insert into opdb.
-        pfsConfigUtils.ingestPfsConfig(pfsConfig,
-                                       allocated_at='now',
-                                       converg_num_iter=maxIteration,
-                                       converg_elapsed_time=round(time.time() - start, 3),
-                                       cmd=cmd)
+            # write pfsConfig to disk.
+            pfsConfigUtils.writePfsConfig(pfsConfig, cmd=cmd)
+            # insert into opdb.
+            pfsConfigUtils.ingestPfsConfig(pfsConfig,
+                                        allocated_at='now',
+                                        converg_num_iter=maxIteration,
+                                        converg_elapsed_time=round(time.time() - start, 3),
+                                        cmd=cmd)
 
-        cmd.inform(f'pfsConfig=0x{pfsConfig.pfsDesignId:016x},{visit},Done')
+            cmd.inform(f'pfsConfig=0x{pfsConfig.pfsDesignId:016x},{visit},Done')
         cmd.finish(f'text="Moved all arms back to home"')
 
     def cobraAndDotRecenter(self, cmd):
