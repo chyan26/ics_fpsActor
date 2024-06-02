@@ -818,7 +818,7 @@ class FpsCmd(object):
         designId = cmdKeys['designId'].values[0] if 'designId' in cmdKeys else None
 
         self.cc.expTime = expTime
-        cmd.inform(f'text="Setting moveToHome expTime={expTime}"')
+        cmd.inform(f'text="Setting moveToHome expTime={expTime}, noMCSexposure={noMCSexposure}"')
 
         visit = self.actor.visitor.setOrGetVisit(cmd)
 
@@ -841,16 +841,17 @@ class FpsCmd(object):
 
         if phi:
             eng.setPhiMode()
-            self.cc.moveToHome(goodCobra, phiEnable=True)
+            self.cc.moveToHome(goodCobra, phiEnable=True, 
+                               noMCS=noMCSexposure)
 
         if theta:
             eng.setThetaMode()
-            self.cc.moveToHome(goodCobra, thetaEnable=True)
+            self.cc.moveToHome(goodCobra, thetaEnable=True,
+                               noMCS=noMCSexposure)
 
         if allfiber:
             eng.setNormalMode()
             if noMCSexposure:
-                cmd.inform(f'text="noMCSExposure is {noMCSexposure}, skipping MCS operation."')
                 self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, thetaCCW=False, noMCS=True)
             else:
                 diff = self.cc.moveToHome(goodCobra, thetaEnable=True, phiEnable=True, thetaCCW=False)
